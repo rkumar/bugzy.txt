@@ -26,7 +26,7 @@ User Documentation
 
 3. Make the bugzy.sh file executable, and place it in your PATH.
 
-    > `chmod +x bugzy.sh`
+    > `chmod +x bugzy.sh`  
     > `mv bugzy.sh ~/bin`
 
 4. Move the config file to your home directory.
