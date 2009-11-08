@@ -1,4 +1,4 @@
-DISTFILES := bugzy.cfg bugzy.sh
+DISTFILES := bugzy.cfg bugzy.sh README.markdown
 VERSION := 0.1
  
 DISTNAME=bugzy.txt-$(VERSION)
