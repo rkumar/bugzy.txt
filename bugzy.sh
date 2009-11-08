@@ -1,26 +1,22 @@
 #!/bin/bash
 #*******************************************************#
+# A simple file based bug tracker                       #
 #                                                       #
-#                                                       #
-# Arunachalesha                                         #
+# rkumar                                                #
 # $Id$  #
 #*******************************************************#
-# if running as a cronjob prepend /opt/local/bin:/opt/local/sbin
-# export PATH="/opt/local/bin:/opt/local/sbin:$PATH:/Users/rahul/bin"
-# also cd in the folder you want.
-# cd /Users/rahul/bin
+## TODO : AAA editing of title and other single line  - DONE for comment
+## TODO : BBB add id to format since user can edit id from title - DONE
+## TODO : CCC comment adding, no need to edit, just add
+#
+#
 #### --- cleanup code use at start ---- ####
 TMP_FILE=${TMPDIR:-/tmp}/prog.$$
 trap "rm -f $TMP_FILE.?; exit 1" 0 1 2 3 13 15
-# at end of prog
-#rm -f $TMP_FILE.?
-#trap 0
-#exit 0
 PROGNAME=$(basename "$0")
 TODO_SH=$PROGNAME
 #TODO_DIR="/Users/rahul/work/projects/rbcurse"
 export PROGNAME
-Revision="0.1"
 Date="2009-11-06"
 arg0=$(basename "$0")
 
@@ -236,6 +232,9 @@ print_tasks()
           echo -ne "$items\n"
 
 }
+## logging of changes
+## appended to end of file, so log should be last entry
+## i could reverse append it after the log keyword
 log_changes()
 {
     key=$1
@@ -255,7 +254,7 @@ while getopts hvVf:o:D:d: flag
 do
     case "$flag" in
     (h) help; exit 0;;
-    (V) echo "$arg0: version $Revision ($Date) Author: rkumar"; exit 0;;
+    (V) echo "$arg0: version @REVISION@ ($Date) Author: rkumar"; exit 0;;
     (v) VERBOSE_FLAG=1;;
     (f) file="$OPTARG";;
     (o) out="$OPTARG";;
@@ -316,7 +315,7 @@ shift
 case $action in
 "add" | "a")
     if [[ -z "$1" ]]; then
-        echo -n "Add: "
+        echo -n "Enter a short title/subject: "
         read input
     else
         input=$*
@@ -334,6 +333,7 @@ case $action in
         now=`date '+%Y-%m-%d %H:%M'`
     sed -e 's/^    //' <<EndUsage >"$editfile"
     title: $todo
+    id: $serialid
     description:
 
     date_created: $now
@@ -350,7 +350,7 @@ EndUsage
     fi
        cleanup;;
 "del" | "rm")
-    errmsg="usage: $TODO_SH del Task#"
+    errmsg="usage: $TODO_SH del task#"
     item=$1
     [ -z "$item" ] && die "$errmsg"
 
@@ -361,7 +361,7 @@ EndUsage
 
        cleanup;;
 "edit" | "ed")
-    errmsg="usage: $TODO_SH ed Task#"
+    errmsg="usage: $TODO_SH ed task#"
     item=$1
     [ -z "$item" ] && die "$errmsg"
 
@@ -371,7 +371,7 @@ EndUsage
 
        cleanup;;
 "modify" | "mod")
-    errmsg="usage: $TODO_SH $action Task#"
+    errmsg="usage: $TODO_SH $action task#"
     item=$1
     hash_set "VALUES" "status" "open closed started stopped canceled "
     hash_set "VALUES" "severity" "critical serious normal"
@@ -381,14 +381,14 @@ EndUsage
     [ -z "$item" ] && die "$errmsg"
     [[ "$item" = +([0-9]) ]] || die "$errmsg"
     file=$ISSUES_DIR/${item}.txt
-    CHOICES=$(grep '^[a-z_0-9]*:' $file | cut -d':' -f1 )
+    CHOICES=$(grep '^[a-z_0-9]*:' $file | egrep -v '^log:|^date_|^id:' | cut -d':' -f1  )
     echo "Select field to edit"
     #echo $CHOICES
     reply=`ask` 
-    echo "reply is $reply"
+    #echo "reply is $reply"
     oldvalue=$(grep "^$reply:" $file | cut -d':' -f2-)
     oldvalue=${oldvalue## }
-    echo "Select new $reply (old was \"$oldvalue\")"
+    [ -z "$oldvalue" ] || echo "Select new $reply (old was \"$oldvalue\")"
     CHOICES=`hash_echo "VALUES" "$reply"`
     if [ ! -z "${CHOICES}" ] 
     then
@@ -403,11 +403,35 @@ EndUsage
         cat $file
     else
         case $reply in
+            "title" )
+                # AAA
+                echo "$oldvalue" > $TMP_FILE
+                edit_tmpfile
+                [ $RESULT -gt 0 ] && {
+                   text=$(cat $TMP_FILE)
+                   sed -i.bak "/^$reply:/s/^.*$/$reply: $text/" $file
+                   log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
+                   diff $file $file.bak
+                }
+            ;;
             "comment" )
+            # CCC
                 echo "Enter new $reply:"
                 read input
+                [ -z "$input" ] || {
+                    start=$(sed -n "/^$reply:/=" $file)
+                    now=`date '+%Y-%m-%d %H:%M'`
+                    text="- $now: $input"
+ex - $file<<!
+${start}a
+$text
+.
+x
+!
+        log_changes $reply "${input:0:15} ..." "${#input} chars" "$file"
+    }
                 ;;
-            "description" | "fix" | "title" )
+            "description" | "fix" )
             # FIXME single line keys like title bonking
             # i print them on next line, since i don't know they were on same row.
                 description=`extract_header $reply $file`
@@ -432,10 +456,12 @@ $text
 x
 !
         log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
-echo "edited file is:"
-cat $file | sed 's/^/> /'
-echo " "
-diff $file $file.bak.1
+    [ $VERBOSE_FLAG -gt 0 ] && {
+    echo "edited file is:"
+    cat $file | sed 's/^/> /'
+    echo " "
+    }
+    diff $file $file.bak.1
                 }
                 
                 ;;

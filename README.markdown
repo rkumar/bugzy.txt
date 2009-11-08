@@ -1,5 +1,5 @@
-BUGZY.TXT Command Line Interface
-================================
+BUGZY.TXT Command Line Bug Tracker
+==================================
 
 A simple (and not yet extensible) shell script for managing bugs/features/enhancements and tasks.
 
