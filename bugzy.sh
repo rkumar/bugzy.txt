@@ -282,7 +282,7 @@ get_input()
     [ ! -z defval ] && local prompts=" [default is $defval]"
     echo -n "Enter ${field}${prompts}: "
     read input
-    [ -z "$input" ] input="$defval"
+    [ -z "$input" ] && input="$defval"
     RESULT=$input
 }
 
@@ -299,6 +299,35 @@ convert_due_date()
        result=$ginput
    fi
    echo "$result"
+}
+## 
+## option, prompt
+## eaxmple:     process_quadoptions  "$SEND_EMAIL" "Send file by email?"
+process_quadoptions()
+{
+    RESULT=""
+    local input
+    case "$1" in
+        "yes" | "no" ) RESULT="$1";;
+        "ask-yes" | "ask-no" ) 
+        local yn=${1:4:1}
+        local yesno=${1:4}
+        local input
+        while true 
+        do
+            echo -n "$2 y/n [default $yn]: "
+            read input
+            input=$(echo "$input" | tr "A-Z" "a-z")
+            [[ -z "$input" || "${input:0:1}" == "$yn" ]] && input="$yesno"; break;
+            local oppo_of_yn=$(echo "$yn" | tr "yn" "ny" )
+            local oppo_of_yesno="yes"
+            [ "$oppo_of_yn" == "n"] && oppo_of_yesno="no"
+            [ "${input:0:1}" == "$oppo_of_yn" ] && input="$oppo_of_yesno"; break;
+            loop
+        done
+        RESULT=$input
+        ;;
+    esac
 }
      
 ## ADD FUNCTIONS HERE
@@ -442,6 +471,14 @@ case $action in
 EndUsage
     $EDITOR $editfile
     fi
+    process_quadoptions  "$SEND_EMAIL" "Send file by email?"
+    #[ $RESULT == "yes" ] && get_input "emailid" "$ASSIGNED_TO"
+    [ "$RESULT" == "yes" ] && {
+        get_input "emailid" "$EMAIL_TO"
+        #"cat $file | mail -s $title  "
+        [ ! -z "$EMAIL_TO" ] && cat "$editfile" | mail -s "$todo" $EMAIL_TO
+    }
+
        cleanup;;
 "del" | "rm")
     errmsg="usage: $TODO_SH del task#"
