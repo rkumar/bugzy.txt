@@ -1,5 +1,5 @@
 DISTFILES := bugzy.cfg README.markdown
-VERSION := 0.1
+VERSION := 0.1.1
  
 all: install
 
@@ -20,6 +20,9 @@ clean:
 INSTALL_DIR=~/bin
 
 install:
-	#cp -i bugzy.cfg ~/
+	#diff bugzy.cfg ~/bugzy.cfg
+	#[ bugzy.cgf -nt ~/bugzy.cfg ] && cp -i bugzy.cfg ~/
+	cp -i bugzy.cfg ~/
+
 	cp bugzy.sh $(INSTALL_DIR)/bugzy
 	chmod +x $(INSTALL_DIR)/bugzy
