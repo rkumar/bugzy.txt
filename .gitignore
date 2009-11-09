@@ -1,4 +1,6 @@
 *.tgz
+*.gz
+*.zip
 *.tmp
 *.db
 bak
