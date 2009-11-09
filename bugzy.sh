@@ -18,6 +18,7 @@ TODO_SH=$PROGNAME
 #TODO_DIR="/Users/rahul/work/projects/rbcurse"
 export PROGNAME
 Date="2009-11-06"
+DATE_FORMAT='+%Y-%m-%d %H:%M'
 arg0=$(basename "$0")
 
 #ext=${1:-"default value"}
@@ -102,6 +103,9 @@ function hash_get_into {
 function hash_echo {
     eval "echo $3 \"\$${Hash_config_varname_prefix}${1}_${2}\""
 }
+hash_set "VALUES" "status" "open closed started stopped canceled "
+hash_set "VALUES" "severity" "normal critical serious"
+hash_set "VALUES" "type" "bug feature enhancement task"
 edit_tmpfile()
 {
             mtime=`stat -c %Y $TMP_FILE`
@@ -180,7 +184,7 @@ list()
         filter_command="${filter_command:-}${filter_command:+ | }${post_filter_command:-}"
     }
         items=$(
-        grep -h 'title' $FILELIST \
+        grep -h '^title:' $FILELIST \
         | cut -c 8-  \
         | eval ${TODOTXT_SORT_COMMAND}                                        \
         | sed '''
@@ -222,7 +226,7 @@ print_tasks()
     [ -z "$FILELIST" ] && echo "No matching files" && exit 0
     USEPRI=${USEPRI:-$DEFAULT}
         items=$(
-        grep -h 'title' $FILELIST \
+        grep -h '^title:' $FILELIST \
         | cut -c 8-  \
         | eval ${TODOTXT_SORT_COMMAND}                                        \
         | sed '''
@@ -245,6 +249,58 @@ log_changes()
     echo "- LOG,$now,$key,$oldvalue,$newline" >> $file
 
 }
+## get_code "type"
+get_code()
+{
+    RESULT=
+    CHOICES=`hash_echo "VALUES" "$1"`
+    echo "select a value for $1"
+    [ ! -z "$2" ] && echo "[default is $2]"
+    defaultval=${2:-"---"}
+    if [ ! -z "${CHOICES}" ] 
+    then
+        local input=`ask` 
+        [ -z "$input" ] && input=$defaultval
+        echo "$input"
+        RESULT=$input
+    else
+        echo "$defaultval"
+        RESULT=$defaultval 
+    fi
+}
+
+## get input from user, if user hits enter use default value
+## get_input "username" "john"
+## returns value in RESULT
+get_input()
+{
+    local field=$1
+    local defval="$2"
+    local prompts=""
+    local input
+    
+    [ ! -z defval ] && local prompts=" [default is $defval]"
+    echo -n "Enter ${field}${prompts}: "
+    read input
+    [ -z "$input" ] input="$defval"
+    RESULT=$input
+}
+
+
+convert_due_date()
+{
+   local input="$1"
+   local result
+   if [ ${input:0:1} == '+' ];
+   then
+       input=${input:1}
+       result=$(date --date "$ginput" "$DATE_FORMAT")
+   else
+       result=$ginput
+   fi
+   echo "$result"
+}
+     
 ## ADD FUNCTIONS HERE
 VERBOSE_FLAG=0
 out=
@@ -316,13 +372,49 @@ case $action in
 "add" | "a")
     if [[ -z "$1" ]]; then
         echo -n "Enter a short title/subject: "
-        read input
+        read atitle
     else
-        input=$*
+        atitle=$*
     fi
+    [ "$PROMPT_DESC" == "yes" ] && {
+        echo -n "Enter a description: "
+        read i_desc
+    }
+    i_type=${DEFAULT_TYPE:-"bug"}
+    i_severity=${DEFAULT_SEVERITY:-"normal"}
+    i_status=${DEFAULT_STATUS:-"open"}
+    [ "$PROMPT_DEFAULT_TYPE" == "yes" ] && {
+        #i_type=`get_code "type" "$DEFAULT_TYPE"`
+        get_code "type" "$DEFAULT_TYPE"
+        i_type=$RESULT
+    }
+    [ "$PROMPT_DEFAULT_SEVERITY" == "yes" ] && {
+        get_code "severity" "$DEFAULT_SEVERITY"
+        i_severity=$RESULT
+    }
+    [ "$PROMPT_DEFAULT_STATUS" == "yes" ] && {
+        get_code "status" "$DEFAULT_STATUS"
+        i_status=$RESULT
+    }
+    prompts=
+    i_due_date=`convert_due_date "$DEFAULT_DUE_DATE"`
+    [ "$PROMPT_DUE_DATE" == "yes" ] && {
+        [ ! -z "$i_due_date" ] && prompts=" [default is $i_due_date]"
+        echo -n "Enter a due date $prompts: "
+        read due_date
+        [ ! -z "$due_date" ] && i_due_date=`convert_due_date "$due_date"`
+    }
+    prompts=
+    [ "$PROMPT_ASSIGNED_TO" == "yes" ] && {
+        [ ! -z "$ASSIGNED_TO" ] && prompts=" [default is $ASSIGNED_TO]"
+        echo -n "Enter assigned to $prompts: "
+        read assigned_to
+        [ ! -z "$assigned_to" ] && ASSIGNED_TO=$assigned_to
+    }
+
     serialid=`incr_id`
     task="[Task #$serialid]"
-    todo="$task $input"
+    todo="$task $atitle"
     [ -d "$ISSUES_DIR" ] || mkdir "$ISSUES_DIR"
     editfile=$ISSUES_DIR/${serialid}.txt
     if [ -f $editfile ];
@@ -335,11 +427,13 @@ case $action in
     title: $todo
     id: $serialid
     description:
-
+    $i_desc
     date_created: $now
-    status: open
-    severity: normal
-    type: task
+    status: $i_status
+    severity: $i_severity
+    type: $i_type
+    assigned_to: $ASSIGNED_TO
+    due_date: $i_due_date
     comment: 
 
     fix: 
@@ -356,7 +450,7 @@ EndUsage
 
     [[ "$item" = +([0-9]) ]] || die "$errmsg"
     file=$ISSUES_DIR/${item}.txt
-    grep "title" $file
+    grep "^title" $file
     mv $file $file.bak
 
        cleanup;;
@@ -373,9 +467,6 @@ EndUsage
 "modify" | "mod")
     errmsg="usage: $TODO_SH $action task#"
     item=$1
-    hash_set "VALUES" "status" "open closed started stopped canceled "
-    hash_set "VALUES" "severity" "critical serious normal"
-    hash_set "VALUES" "type" "bug feature enhancement task"
     severity_values="critical serious normal"
     type_values="bug feature enhancement task"
     [ -z "$item" ] && die "$errmsg"
