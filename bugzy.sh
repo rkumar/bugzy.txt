@@ -259,11 +259,11 @@ print_tasks()
 ## i could reverse append it after the log keyword
 log_changes()
 {
-    key=$1
-    oldvalue=$2
-    newline=$3
-    file=$4
-    now=`date '+%Y-%m-%d %H:%M'`
+    local key=$1
+    local oldvalue=$2
+    local newline=$3
+    local file=$4
+    local now=`date '+%Y-%m-%d %H:%M'`
     echo "- LOG,$now,$key,$oldvalue,$newline" >> $file
 
 }
@@ -346,6 +346,46 @@ process_quadoptions()
         RESULT=$input
         ;;
     esac
+}
+## returns title for a task id
+get_title()
+{
+    local file=$ISSUES_DIR/$1.txt
+    local mtitle=$(grep "^title:" $file | cut -d':' -f2-)
+    echo "$mtitle"
+}
+## returns value for id and key
+get_value_for_id()
+{
+    local file=$ISSUES_DIR/$1.txt
+    local key=$2
+    local oldvalue=$(grep "^$key:" $file | cut -d':' -f2-)
+    oldvalue=${oldvalue## }
+    echo "$oldvalue"
+}
+change_status()
+{
+    item=$1
+    action=$2
+    errmsg="usage: $TODO_SH $action task#"
+    [ -z "$item" ] && die "$errmsg"
+
+    [[ "$item" = +([0-9]) ]] || die "$errmsg"
+    file=$ISSUES_DIR/${item}.txt
+    [ ! -r "$file" ] && die "No such file: $file"
+    reply="status"; input="$action";
+    oldvalue=`get_value_for_id $item $reply`
+    [ "$oldvalue" == "$action" ] && die "$item is already $oldvalue"
+    var=$( printf "%s" "${action:0:3}" | tr 'a-z' 'A-Z' )
+    echo "$item is currently $oldvalue"
+        newline="$reply: $input"
+        now=`date '+%Y-%m-%d %H:%M'`
+        sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
+    echo "$item is now $input"
+        log_changes $reply "$oldvalue" $input $file
+        mtitle=`get_title $item`
+        [ ! -z "$EMAIL_TO" ] && cat "$file" | mail -s "[$var] $mtitle" $EMAIL_TO
+        diff $file $file.bak
 }
      
 ## ADD FUNCTIONS HERE
@@ -499,7 +539,7 @@ EndUsage
 
        cleanup;;
 "del" | "rm")
-    errmsg="usage: $TODO_SH del task#"
+    errmsg="usage: $TODO_SH $action task#"
     item=$1
     [ -z "$item" ] && die "$errmsg"
 
@@ -511,7 +551,7 @@ EndUsage
 
        cleanup;;
 "edit" | "ed")
-    errmsg="usage: $TODO_SH ed task#"
+    errmsg="usage: $TODO_SH $action task#"
     item=$1
     [ -z "$item" ] && die "$errmsg"
 
@@ -713,6 +753,13 @@ done # while true
     [ -z "$FILELIST" ] || print_tasks
     ;;
     
+    "ope" | "sta" | "clo" | "can" | "sto" | \
+    "open" | "started" | "closed" | "canceled" | "stopped" )
+    [ ${#action} -eq 3 ] && action=$(echo "$action" | sed 's/can/canceled/;s/clo/closed/;s/sto/stopped/;s/ope/open/')
+        item=$1
+        change_status $item "$action"
+        ;;
+
 * )
     usage
     ;;
