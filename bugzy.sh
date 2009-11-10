@@ -350,7 +350,8 @@ process_quadoptions()
 ## returns title for a task id
 get_title()
 {
-    local file=$ISSUES_DIR/$1.txt
+    item=${1:-$item}
+    local file=$ISSUES_DIR/$item.txt
     local mtitle=$(grep "^title:" $file | cut -d':' -f2-)
     echo "$mtitle"
 }
@@ -385,8 +386,48 @@ change_status()
         log_changes $reply "$oldvalue" $input $file
         mtitle=`get_title $item`
         [ ! -z "$EMAIL_TO" ] && cat "$file" | mail -s "[$var] $mtitle" $EMAIL_TO
-        diff $file $file.bak
+        show_diffs 
 }
+## for actoins that require a bug id
+## sets item, file
+common_validation()
+{
+    item=$1
+    local errmsg="$2"
+    #local argct=${3:-2}
+
+    #[ "$#" -ne $argct ] && die "$errmsg"
+    [[ "$item" = +([0-9]) ]] || die "$errmsg"
+    file=$ISSUES_DIR/${item}.txt
+    [ ! -r "$file" ] && die "No such file: $file"
+
+#    [ $VERBOSE_FLAG -gt 0 ] && grep "^title:" $file
+}
+show_diffs()
+{
+    local file=${1:-$file}
+    local filebak=${2:-$file.bak}
+    [ "$SHOW_DIFFS_ON_UPDATE" == "yes" ] && diff $filebak $file
+}
+## prints various fields for an item number
+# pass item number and then one ore more fields.
+show_info()
+{
+    item=$1
+    file=$ISSUES_DIR/${item}.txt
+    shift
+    local str=""
+    fields="$*"
+    #if no field passed use title
+    fields=${fields:-"title"}
+    #[ $VERBOSE_FLAG -gt 0 ] && { 
+    for ii in $fields
+    do
+        str="$str "`grep "^$ii:" $file | cut -d':' -f2-`" |"
+    done
+    echo "$str" #| tr '\n' '|'
+}
+
      
 ## ADD FUNCTIONS HERE
 VERBOSE_FLAG=0
@@ -600,7 +641,7 @@ EndUsage
                    let modified+=1
         #echo "- LOG,$now,$reply,$oldvalue,$newline" >> $file
         echo "done ..."
-        diff $file $file.bak
+        show_diffs
     else
         case $reply in
             "title" )
@@ -611,7 +652,7 @@ EndUsage
                    text=$(cat $TMP_FILE)
                    sed -i.bak "/^$reply:/s/^.*$/$reply: $text/" $file
                    log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
-                   diff $file $file.bak
+                   show_diffs 
                    let modified+=1
                 }
             ;;
@@ -664,7 +705,7 @@ x
     cat $file | sed 's/^/> /'
     echo " "
     }
-    diff $file $file.bak.1
+    show_diffs $file $file.bak.1 
                 }
                 
                 ;;
@@ -761,31 +802,40 @@ done # while true
         ;;
 
     "pri" )
-    item=$1
-    newpri=$( printf "%s\n" "$2" | tr 'a-z' 'A-Z' )
 
     errmsg="usage: $TODO_SH pri ITEM# PRIORITY
 note: PRIORITY must be anywhere from A to Z."
 
     [ "$#" -ne 2 ] && die "$errmsg"
-    [[ "$item" = +([0-9]) ]] || die "$errmsg"
+    common_validation $1 $errmsg
+    newpri=$( printf "%s\n" "$2" | tr 'a-z' 'A-Z' )
     [[ "$newpri" = @([A-Z]) ]] || die "$errmsg"
-    file=$ISSUES_DIR/${item}.txt
-    [ ! -r "$file" ] && die "No such file: $file"
 
     #sed -e $item"s/^(.) //" -e $item"s/^/($newpri) /" "$TODO_FILE" > /dev/null 2>&1
 
     #if [ "$?" -eq 0 ]; then
         #it's all good, continue
-        grep "^title:" $file
+        [ $VERBOSE_FLAG -gt 0 ] && grep "^title:" $file
+        show_info $item
         sed  -i.bak -e "s/^\(title: \[.*\]\) (.)/\1/" -e  "s/^\(title: \[.*\]\)/\1 ($newpri)/" $file
-        grep "^title:" $file
-        diff $file $file.bak
+        [ $VERBOSE_FLAG -gt 0 ] && grep "^title:" $file
+        show_info $item 'title' 'type' 'status'
+        show_diffs 
         cleanup
     #else
     #    die "$errmsg"
     #fi;;
         ;;
+        "depri")
+        errmsg="usage: $TODO_SH depri ITEM#"
+        common_validation $1 $errmsg 
+        get_title
+        sed  -i.bak "s/^\(title: \[.*\]\) (.)/\1/" $file
+        get_title
+        show_diffs 
+        cleanup
+        ;;
+
 * )
     usage
     ;;
