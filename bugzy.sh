@@ -760,6 +760,32 @@ done # while true
         change_status $item "$action"
         ;;
 
+    "pri" )
+    item=$1
+    newpri=$( printf "%s\n" "$2" | tr 'a-z' 'A-Z' )
+
+    errmsg="usage: $TODO_SH pri ITEM# PRIORITY
+note: PRIORITY must be anywhere from A to Z."
+
+    [ "$#" -ne 2 ] && die "$errmsg"
+    [[ "$item" = +([0-9]) ]] || die "$errmsg"
+    [[ "$newpri" = @([A-Z]) ]] || die "$errmsg"
+    file=$ISSUES_DIR/${item}.txt
+    [ ! -r "$file" ] && die "No such file: $file"
+
+    #sed -e $item"s/^(.) //" -e $item"s/^/($newpri) /" "$TODO_FILE" > /dev/null 2>&1
+
+    #if [ "$?" -eq 0 ]; then
+        #it's all good, continue
+        grep "^title:" $file
+        sed  -i.bak -e "s/^\(title: \[.*\]\) (.)/\1/" -e  "s/^\(title: \[.*\]\)/\1 ($newpri)/" $file
+        grep "^title:" $file
+        diff $file $file.bak
+        cleanup
+    #else
+    #    die "$errmsg"
+    #fi;;
+        ;;
 * )
     usage
     ;;
