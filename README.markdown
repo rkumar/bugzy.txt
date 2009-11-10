@@ -27,7 +27,7 @@ User Documentation
 3. Make the bugzy.sh file executable, and place it in your PATH.
 
     > `chmod +x bugzy.sh`  
-    > `mv bugzy.sh ~/bin`
+    > `mv bugzy.sh ~/bin/bugzy`
 
 4. Move the config file to your home directory.
 
@@ -40,7 +40,21 @@ The bug files are created in a directory ".todos" inside TODO_DIR.
 Current operations include add, mod, edit (edit the file itself), delete, list, list by severity,
 select (based on a key).
 
+Actions to directly change status are open, started, closed, canceled, stopped or the first 3 letter of each.
+
+"selectm" or "selm" is a multiple criteria search as:
+    bugzy selectm "type: bug" "status: open" ...
+    bugzy selectm "type=bug" "status=(open|started)" "severity=critical"
+
+"pri" adds a priority to as task or bug, which results in a change in color, and having it 
+sorted above.
+
 TO ADD MORE HERE.
+
+You may also alias bugzy to "b" in ~/.bashrc or equivalent:
+
+     > alias b='bugzy -d ~/bugzy.cfg'  
+     > Then use as `b add "Module aaa crashes on startup"`
 
 Others
 ------
