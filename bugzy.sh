@@ -218,8 +218,23 @@ showtitles_where()
     key=$1
     value=$2
     tasks=$(grep -l "$key:.*$value" $ISSUES_DIR/*.txt)
-    #echo "tasks: $tasks"
     greptitles $tasks 
+}
+showtitles_where_multi()
+{
+    local crit=$1
+    local ctr=$2
+    #echo "ctr: $ctr, crit: $crit"
+    local file
+    local files=""
+    for file in $ISSUES_DIR/*.txt
+    do
+        matches=$(egrep -c "$crit"  $file)
+        #echo "matches: $matches"
+        [ $matches -eq $ctr ] && files="$files $file"
+    done
+    #echo "files: $files"
+    greptitles $files
 }
 print_tasks()
 {
@@ -487,6 +502,7 @@ EndUsage
 
     [[ "$item" = +([0-9]) ]] || die "$errmsg"
     file=$ISSUES_DIR/${item}.txt
+    # TODO only confirm if not forced
     grep "^title" $file
     mv $file $file.bak
 
@@ -528,7 +544,7 @@ EndUsage
         log_changes $reply $oldvalue $input $file
         #echo "- LOG,$now,$reply,$oldvalue,$newline" >> $file
         echo "done ..."
-        cat $file
+        cp $file $file.bak
     else
         case $reply in
             "title" )
@@ -631,6 +647,26 @@ x
     count=$(echo $valid | grep -c $key)
     [ $count -eq 1 ] || die "$errmsg"
     showtitles_where $*
+    
+    ;;
+"selectm" | "selm")
+    valid="|status|date_created|severity|type|"
+    errmsg="usage: $TODO_SH $action \"type: bug\" \"status: open\" ..."
+    [ -z "$1" ] && die "$errmsg"
+    #[ -z "$key" ] && die "$errmsg"
+    #[ -z "$value" ] && die "$errmsg"
+    #key=$( printf "%s\n" "$key" | tr 'A-Z' 'a-z' )
+
+    #echo "selm received: $#,  $*"
+    ctr=1
+    crit=$1
+    shift
+    for ii in "$@"
+    do
+        crit="$crit|$ii"
+        let ctr+=1
+    done
+    showtitles_where_multi "$crit" $ctr
     
     ;;
 "lbs")
