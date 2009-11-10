@@ -220,10 +220,13 @@ showtitles_where()
     tasks=$(grep -l "$key:.*$value" $ISSUES_DIR/*.txt)
     greptitles $tasks 
 }
+## a lot of problems passing crit with spaces in it
+## send in criteria in one strnig and count of criteria.
 showtitles_where_multi()
 {
     local crit=$1
     local ctr=$2
+    crit=$(echo $crit | sed 's/=/: /g')
     #echo "ctr: $ctr, crit: $crit"
     local file
     local files=""
@@ -519,16 +522,28 @@ EndUsage
        cleanup;;
 "modify" | "mod")
     errmsg="usage: $TODO_SH $action task#"
+    modified=0
     item=$1
     severity_values="critical serious normal"
     type_values="bug feature enhancement task"
     [ -z "$item" ] && die "$errmsg"
     [[ "$item" = +([0-9]) ]] || die "$errmsg"
     file=$ISSUES_DIR/${item}.txt
-    CHOICES=$(grep '^[a-z_0-9]*:' $file | egrep -v '^log:|^date_|^id:' | cut -d':' -f1  )
+    MAINCHOICES=$(grep '^[a-z_0-9]*:' $file | egrep -v '^log:|^date_|^id:' | cut -d':' -f1  )
+    MAINCHOICES="$MAINCHOICES quit"
+    while true
+    do
+        CHOICES="$MAINCHOICES"
     echo "Select field to edit"
     #echo $CHOICES
     reply=`ask` 
+    [ "$reply" == "quit" ] && {
+      [ $modified -gt 0 ] && {
+      mtitle=$(grep "^title:" $file | cut -d':' -f2-)
+        [ ! -z "$EMAIL_TO" ] && cat "$file" | mail -s "[M] $mtitle" $EMAIL_TO
+        }
+      break
+    }
     #echo "reply is $reply"
     oldvalue=$(grep "^$reply:" $file | cut -d':' -f2-)
     oldvalue=${oldvalue## }
@@ -542,9 +557,10 @@ EndUsage
         now=`date '+%Y-%m-%d %H:%M'`
         sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
         log_changes $reply $oldvalue $input $file
+                   let modified+=1
         #echo "- LOG,$now,$reply,$oldvalue,$newline" >> $file
         echo "done ..."
-        cp $file $file.bak
+        diff $file $file.bak
     else
         case $reply in
             "title" )
@@ -556,6 +572,7 @@ EndUsage
                    sed -i.bak "/^$reply:/s/^.*$/$reply: $text/" $file
                    log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
                    diff $file $file.bak
+                   let modified+=1
                 }
             ;;
             "comment" )
@@ -573,6 +590,7 @@ $text
 x
 !
         log_changes $reply "${input:0:15} ..." "${#input} chars" "$file"
+                   let modified+=1
     }
                 ;;
             "description" | "fix" )
@@ -600,6 +618,7 @@ $text
 x
 !
         log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
+                   let modified+=1
     [ $VERBOSE_FLAG -gt 0 ] && {
     echo "edited file is:"
     cat $file | sed 's/^/> /'
@@ -614,6 +633,7 @@ x
 
         # actually we need to let user edit existing value in editor
     fi
+done # while true
        cleanup;;
 "move" | "mv")
     echo "action is $action"
