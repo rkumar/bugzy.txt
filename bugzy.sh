@@ -913,11 +913,29 @@ note: PRIORITY must be anywhere from A to Z."
         fields="$*"
         fields=${fields:-"id status severity type title"}
         fields="^$fields"
+        count=$( echo $fields | tr ' ' '\n' | wc -l ) 
+
         fields=$( echo "$fields" | sed 's/ /|^/g' )
         echo "fields::$fields"
         FILELIST=${FILELIST:-$ISSUES_DIR/*.txt}
         data=$( egrep -h $fields $FILELIST | cut -d':' -f2- )
-        echo "$data" | paste -d '|' - - - - - 
+        #echo "$data" | paste -d '|' - - - - - 
+        #echo "$data" | paste -d '||||\n' - - - - -
+        # pasting the lines together, paste does not let us change number of lines programmatically
+        ctr=0
+        echo "$data" | while read LINE
+        do
+                echo -n "$LINE | "
+                let ctr+=1
+                if [ $ctr -eq $count ];
+                then
+                    ctr=0
+                    echo ""
+                fi
+                :
+        done
+
+
         #| awk -F'|' 'BEGIN {OFS="|"} { print $2, $3, $4, $5, $1}'
         #{ print $2 $3 $4 $5 $1; }'
         ;;
