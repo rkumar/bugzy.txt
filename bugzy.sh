@@ -378,6 +378,16 @@ get_value_for_id()
 {
     local file=$ISSUES_DIR/$1.txt
     local key=$2
+    [ -z "$2" ] && die "get_value requires 2 params"
+    local oldvalue=$(grep -m 1 "^$key:" $file | cut -d':' -f2-)
+    oldvalue=${oldvalue## }
+    echo "$oldvalue"
+}
+get_value_from_file()
+{
+    local file=$1
+    local key=$2
+    [ -z "$2" ] && die "get_value requires 2 params"
     local oldvalue=$(grep -m 1 "^$key:" $file | cut -d':' -f2-)
     oldvalue=${oldvalue## }
     echo "$oldvalue"
@@ -435,7 +445,7 @@ show_info()
     file=$ISSUES_DIR/${item}.txt
     shift
     local str=""
-    fields="$*"
+    local fields="$*"
     #if no field passed use title
     fields=${fields:-"title"}
     for ii in $fields
@@ -640,7 +650,7 @@ EndUsage
     [ "$reply" == "quit" ] && {
       [ $modified -gt 0 ] && {
       mtitle=$(grep -m 1 "^title:" $file | cut -d':' -f2-)
-        [ ! -z "$EMAIL_TO" ] && cat "$file" | mail -s "[M] $mtitle" $EMAIL_TO
+        [ ! -z "$EMAIL_TO" ] && cat "$file" | mail -s "[MOD] $mtitle" $EMAIL_TO
         }
       break
     }
@@ -853,6 +863,17 @@ note: PRIORITY must be anywhere from A to Z."
         get_title
         show_diffs 
         cleanup
+        ;;
+
+        "show" )
+        fields="$*"
+        fields=${fields:-"id status severity type title"}
+        FILELIST=${FILELIST:-$ISSUES_DIR/*.txt}
+        for file in $FILELIST
+        do
+            item=`get_value_from_file $file "id" `
+            show_info $item $fields
+        done
         ;;
 
 * )
