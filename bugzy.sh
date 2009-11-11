@@ -157,10 +157,10 @@ list()
     #echo "list 2 FILELIST: $FILELIST"
 
 
-    [ $VERBOSE_FLAG -gt 0 ] && echo "$arg0: list : $@"
+    [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: list : $@"
     for search_term in "$@"
     do
-    [ $VERBOSE_FLAG -gt 0 ] && echo "$arg0: search_term is $search_term "
+    [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: search_term is $search_term "
         ## See if the first character of $search_term is a dash
         if [ ${search_term:0:1} != '-' ]
         then
@@ -177,14 +177,14 @@ list()
                 grep -v -i \"${search_term:1}\" "
         fi
     done
-    [ $VERBOSE_FLAG -gt 0 ] && echo "$arg0: filter_command is $filter_command "
+    [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: filter_command is $filter_command "
 
     ## If post_filter_command is set, append it to the filter_command
     [ -n "$post_filter_command" ] && {
         filter_command="${filter_command:-}${filter_command:+ | }${post_filter_command:-}"
     }
         items=$(
-        grep -h '^title:' $FILELIST \
+        grep -h -m 1 '^title:' $FILELIST \
         | cut -c 8-  \
         | eval ${TODOTXT_SORT_COMMAND}                                        \
         | sed '''
@@ -200,6 +200,24 @@ list()
         filtered_items=$items
     fi
     echo -ne "$filtered_items\n"
+
+    if [ $VERBOSE_FLAG -gt 0 ]; then
+        NUMTASKS=$( echo -ne "$filtered_items" | sed -n '$ =' )
+        #TOTALTASKS=$( echo -ne "$items" | sed -n '$ =' )
+        TOTALTASKS=$( ls $ISSUES_DIR/*.txt | wc -l )
+
+
+        echo "--"
+        echo "${NUMTASKS:-0} of ${TOTALTASKS:-0} issues shown from $ISSUES_DIR"
+
+        statuses=$( grep -h -m 1 '^status:' $FILELIST | sort -u | cut -c 9- )
+        for ii in $statuses
+        do
+            #echo  -n "$ii:"
+            printf "%12s: " "$ii"
+            grep -m 1 "^status: $ii" $FILELIST | wc -l
+        done
+    fi
 }
 greptitles()
 {
@@ -244,7 +262,7 @@ print_tasks()
     [ -z "$FILELIST" ] && echo "No matching files" && exit 0
     USEPRI=${USEPRI:-$DEFAULT}
         items=$(
-        grep -h '^title:' $FILELIST \
+        grep -h  '^title:' $FILELIST \
         | cut -c 8-  \
         | eval ${TODOTXT_SORT_COMMAND}                                        \
         | sed '''
@@ -352,7 +370,7 @@ get_title()
 {
     item=${1:-$item}
     local file=$ISSUES_DIR/$item.txt
-    local mtitle=$(grep "^title:" $file | cut -d':' -f2-)
+    local mtitle=$(grep -m 1 "^title:" $file | cut -d':' -f2-)
     echo "$mtitle"
 }
 ## returns value for id and key
@@ -360,7 +378,7 @@ get_value_for_id()
 {
     local file=$ISSUES_DIR/$1.txt
     local key=$2
-    local oldvalue=$(grep "^$key:" $file | cut -d':' -f2-)
+    local oldvalue=$(grep -m 1 "^$key:" $file | cut -d':' -f2-)
     oldvalue=${oldvalue## }
     echo "$oldvalue"
 }
@@ -420,17 +438,16 @@ show_info()
     fields="$*"
     #if no field passed use title
     fields=${fields:-"title"}
-    #[ $VERBOSE_FLAG -gt 0 ] && { 
     for ii in $fields
     do
-        str="$str "`grep "^$ii:" $file | cut -d':' -f2-`" |"
+        str="$str "`grep -m 1 "^$ii:" $file | cut -d':' -f2-`" |"
     done
     echo "$str" #| tr '\n' '|'
 }
 
      
 ## ADD FUNCTIONS HERE
-VERBOSE_FLAG=0
+VERBOSE_FLAG=${VERBOSE_FLAG:-1}
 out=
 file=
 Dflag=
@@ -439,7 +456,9 @@ do
     case "$flag" in
     (h) help; exit 0;;
     (V) echo "$arg0: version @REVISION@ ($Date) Author: rkumar"; exit 0;;
-    (v) VERBOSE_FLAG=1;;
+    (v) 
+        : $(( VERBOSE_FLAG++ ))
+        ;;
     (f) file="$OPTARG";;
     (o) out="$OPTARG";;
     (D) Dflag="$Dflag $OPTARG";;
@@ -587,7 +606,7 @@ EndUsage
     [[ "$item" = +([0-9]) ]] || die "$errmsg"
     file=$ISSUES_DIR/${item}.txt
     # TODO only confirm if not forced
-    grep "^title" $file
+    grep -m 1 "^title" $file
     mv $file $file.bak
 
        cleanup;;
@@ -620,13 +639,13 @@ EndUsage
     reply=`ask` 
     [ "$reply" == "quit" ] && {
       [ $modified -gt 0 ] && {
-      mtitle=$(grep "^title:" $file | cut -d':' -f2-)
+      mtitle=$(grep -m 1 "^title:" $file | cut -d':' -f2-)
         [ ! -z "$EMAIL_TO" ] && cat "$file" | mail -s "[M] $mtitle" $EMAIL_TO
         }
       break
     }
     #echo "reply is $reply"
-    oldvalue=$(grep "^$reply:" $file | cut -d':' -f2-)
+    oldvalue=$(grep -m 1 "^$reply:" $file | cut -d':' -f2-)
     oldvalue=${oldvalue## }
     [ -z "$oldvalue" ] || echo "Select new $reply (old was \"$oldvalue\")"
     CHOICES=`hash_echo "VALUES" "$reply"`
@@ -700,7 +719,7 @@ x
 !
         log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
                    let modified+=1
-    [ $VERBOSE_FLAG -gt 0 ] && {
+    [ $VERBOSE_FLAG -gt 1 ] && {
     echo "edited file is:"
     cat $file | sed 's/^/> /'
     echo " "
@@ -733,7 +752,7 @@ done # while true
 
     count=$(echo $valid | grep -c $status)
     [ $count -eq 1 ] || die "$errmsg"
-    tasks=$(grep -l "status: *$status" $ISSUES_DIR/*.txt)
+    tasks=$(grep -l -m 1 "status: *$status" $ISSUES_DIR/*.txt)
     greptitles $tasks 
     ;;
 "select" | "sel")
@@ -815,10 +834,10 @@ note: PRIORITY must be anywhere from A to Z."
 
     #if [ "$?" -eq 0 ]; then
         #it's all good, continue
-        [ $VERBOSE_FLAG -gt 0 ] && grep "^title:" $file
+        [ $VERBOSE_FLAG -gt 1 ] && grep "^title:" $file
         show_info $item
         sed  -i.bak -e "s/^\(title: \[.*\]\) (.)/\1/" -e  "s/^\(title: \[.*\]\)/\1 ($newpri)/" $file
-        [ $VERBOSE_FLAG -gt 0 ] && grep "^title:" $file
+        [ $VERBOSE_FLAG -gt 1 ] && grep "^title:" $file
         show_info $item 'title' 'type' 'status'
         show_diffs 
         cleanup
