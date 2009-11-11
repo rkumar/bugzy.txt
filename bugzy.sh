@@ -454,6 +454,38 @@ show_info()
     done
     echo "$str" #| tr '\n' '|'
 }
+show_info1()
+{
+    item=$1
+    file=$ISSUES_DIR/${item}.txt
+    data=$( cat $file )
+    shift
+    local str=""
+    local fields="$*"
+    #if no field passed use title
+    fields=${fields:-"title"}
+    for ii in $fields
+    do
+        str="$str "`echo "$data" | grep -m 1 "^$ii:" | cut -d':' -f2-`" |"
+    done
+    echo "$str" #| tr '\n' '|'
+}
+show_info2()
+{
+    item=$1
+    file=$ISSUES_DIR/${item}.txt
+    data=$( cat $file )
+    shift
+    local str=""
+    local fields="$*"
+    #if no field passed use title
+    fields=${fields:-"title"}
+    for ii in $fields
+    do
+        str="$str "`echo "$data" | grep -m 1 "^$ii:" | cut -d':' -f2-`" |"
+    done
+    echo "$str" #| tr '\n' '|'
+}
 
      
 ## ADD FUNCTIONS HERE
@@ -872,8 +904,22 @@ note: PRIORITY must be anywhere from A to Z."
         for file in $FILELIST
         do
             item=`get_value_from_file $file "id" `
-            show_info $item $fields
+            show_info1 $item $fields
         done
+        ;;
+        "show1" )
+        # this uses egrep and is very fast compared to show which selects each field
+        # however, no control over order of fields
+        fields="$*"
+        fields=${fields:-"id status severity type title"}
+        fields="^$fields"
+        fields=$( echo "$fields" | sed 's/ /|^/g' )
+        echo "fields::$fields"
+        FILELIST=${FILELIST:-$ISSUES_DIR/*.txt}
+        data=$( egrep -h $fields $FILELIST | cut -d':' -f2- )
+        echo "$data" | paste -d '|' - - - - - 
+        #| awk -F'|' 'BEGIN {OFS="|"} { print $2, $3, $4, $5, $1}'
+        #{ print $2 $3 $4 $5 $1; }'
         ;;
 
 * )
