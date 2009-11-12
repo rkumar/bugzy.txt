@@ -59,19 +59,19 @@ TO ADD MORE HERE.
 
 You may also alias bugzy to "b" in ~/.bashrc or equivalent:
 
-    > alias b='bugzy -d ~/bugzy.cfg'  
-    > Then use as `b add "Module aaa crashes on startup"`  
-    > b list  
-    > b mod 1  
-    > b start 1  
-    > b cancel 1  
-    > b close 1  
-    > b show  
-    > b add "Module bbb crashes on startup"  
-    > b pri 2 A  
-    > b  
-    > b depri 2  
-    > b  
+    > `alias b='bugzy -d ~/bugzy.cfg'`  
+    > `b add "Module aaa crashes on startup"`  
+    > `b list`  
+    > `b mod 1`  
+    > `b start 1`  
+    > `b cancel 1`  
+    > `b close 1`  
+    > `b show`  
+    > `b add "Module bbb crashes on startup"`  
+    > `b pri 2 A`  
+    > `b`  
+    > `b depri 2`  
+    > `b`  
 
      
  
