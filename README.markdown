@@ -7,6 +7,8 @@ Bugs have a unique persistent serial number. Each bug is written to a separate f
 in the email header like format with title, description, severity, date_created, type, fix, comments,
 log, status, etc.
 
+Mails are sent using the 'mail' command if specified.
+
 Currently, it is very new, help is not documented, just wait a week or 3 before using.
 
 
@@ -38,7 +40,7 @@ The bug files are created in a directory ".todos" inside TODO_DIR.
 ### Usage
 
 Current operations include add, mod, edit (edit the file itself), delete, list, list by severity,
-select (based on a key).
+select (based on a key), show.
 
 Actions to directly change status are open, started, closed, canceled, stopped or the first 3 letter of each.
 
@@ -47,14 +49,19 @@ Actions to directly change status are open, started, closed, canceled, stopped o
     bugzy selectm "type=bug" "status=(open|started)" "severity=critical"
 
 "pri" adds a priority to as task or bug, which results in a change in color, and having it 
-sorted above.
+sorted above. "depri" removes priority.
 
 TO ADD MORE HERE.
 
 You may also alias bugzy to "b" in ~/.bashrc or equivalent:
 
      > alias b='bugzy -d ~/bugzy.cfg'  
-     > Then use as `b add "Module aaa crashes on startup"`
+     > Then use as `b add "Module aaa crashes on startup"`  
+     > b list  
+     > b mod 1  
+     > b start 1  
+     > b close 1  
+     > b show
 
 Others
 ------
