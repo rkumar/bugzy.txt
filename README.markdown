@@ -51,6 +51,10 @@ Actions to directly change status are open, started, closed, canceled, stopped o
 "pri" adds a priority to as task or bug, which results in a change in color, and having it 
 sorted above. "depri" removes priority.
 
+"liststat" lists tasks for a given status (|open|closed|started|stopped|canceled|).
+
+"show" field1 field2 ... (lists the given fields for all tasks)
+
 TO ADD MORE HERE.
 
 You may also alias bugzy to "b" in ~/.bashrc or equivalent:
@@ -60,8 +64,17 @@ You may also alias bugzy to "b" in ~/.bashrc or equivalent:
      > b list  
      > b mod 1  
      > b start 1  
+     > b cancel 1  
      > b close 1  
-     > b show
+     > b show  
+     > b add "Module bbb crashes on startup"  
+     > b pri 2 A  
+     > b  
+     > b depri 2  
+     > b  
+
+     
+ 
 
 Others
 ------
