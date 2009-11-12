@@ -470,6 +470,7 @@ show_info1()
     done
     echo "$str" #| tr '\n' '|'
 }
+# unused
 show_info2()
 {
     item=$1
@@ -486,6 +487,95 @@ show_info2()
     done
     echo "$str" #| tr '\n' '|'
 }
+
+## when displaying in columnar, use what widths to pad
+get_display_widths()
+{
+    field="$1"
+    case "$field" in
+        "title" ) RESULT=40;;
+        "id" ) RESULT=5;;
+        "status" ) RESULT=8;;
+        "severity" ) RESULT=8;;
+        "type" ) RESULT=8;;
+        * ) RESULT=10;;
+    esac
+}
+
+## TOO SLOW, DONT USE
+show_info3(){
+    fields=$*
+    echo "F: $fields"
+        FILELIST=${FILELIST:-$ISSUES_DIR/*.txt}
+        for file in $FILELIST
+        do
+            str=""
+            data=$(cat $file)
+            for ii in $fields
+            do
+                get_display_widths $ii
+                w=$RESULT
+                f=`echo "$data" | grep -m 1 "^$ii:" | cut -d':' -f2-`
+                str="$str "$(printf "%-*s" $w "$f" )" |"
+                #str="$str "`echo "$data" | grep -m 1 "^$ii:" | cut -d':' -f2-`" |"
+            done
+            echo "$str" #| tr '\n' '|'
+        done
+    }
+    # shows columnar data for given fields
+    # TODO : add titles and how many rows displayed
+show_info4(){
+    fields=$*
+    count=$( echo $fields | tr ' ' '\n' | wc -l ) 
+    cd $ISSUES_DIR
+        FILELIST=${FILELIST:-*.txt}
+        str1=""
+        declare -a widths
+        ctr=0
+        for ii in $fields
+        do
+            get_display_widths $ii
+            widths[$ctr]=$RESULT
+            let ctr+=1
+            if [ -z "$str1" ];
+            then
+                str1=$( grep "^${ii}:" *.txt )
+            else
+                str1="$str1\n"$( grep "^${ii}:" *.txt )
+            fi
+        done
+        str=""
+        for file in *.txt #$FILELIST
+        do
+            if [ -z "$str" ];
+            then
+                str=$( echo -e "$str1" | grep "^$file" | cut -d':' -f3- )
+            else
+                str="$str\n"$( echo -e "$str1" | grep "^$file" | cut -d':' -f3- )
+            fi
+        done
+        ## ideally we should use a control break in case someone deletes a field
+        ctr=0
+        echo "count: $count"
+        echo -e "$str" | while read LINE
+        do
+            #f=$( echo "$LINE" | cut -d':' -f3- )
+            #    echo -n "$f | "
+                #echo -n "$LINE | "
+                printf "%-*s | " ${widths[$ctr]} "$LINE"
+                #echo  "$LINE | "
+                let ctr+=1
+                if [ $ctr -eq $count ];
+                then
+                    ctr=0
+                    echo ""
+                fi
+                :
+        done
+                #get_display_widths $ii
+                #w=$RESULT
+                #str="$str "$(printf "%-*s" $w "$f" )" |"
+    }
 
      
 ## ADD FUNCTIONS HERE
@@ -897,31 +987,44 @@ note: PRIORITY must be anywhere from A to Z."
         cleanup
         ;;
 
-        "show" )
+        "showold" )
+        # TODO validate fields given
+        ## this is slow since each file is opened and each field is grepped
+        # time will be proportional to # of bugs
         fields="$*"
         fields=${fields:-"id status severity type title"}
-        FILELIST=${FILELIST:-$ISSUES_DIR/*.txt}
-        for file in $FILELIST
-        do
-            item=`get_value_from_file $file "id" `
-            show_info1 $item $fields
-        done
+        show_info3 $fields
+#        ids=$( grep -h '^id:' $FILELIST | cut -c 5- )
+#        for item in $ids
+#        do
+#            show_info1 $item $fields
+#        done
         ;;
+        "show" )
+        # TODO validate fields given
+        # TODO titles
+        fields="$*"
+        fields=${fields:-"id status severity type title"}
+        show_info4 $fields
+        ;;
+
         "show1" )
+        ## FASTEST
         # this uses egrep and is very fast compared to show which selects each field
         # however, no control over order of fields
         fields="$*"
         fields=${fields:-"id status severity type title"}
-        fields="^$fields"
         count=$( echo $fields | tr ' ' '\n' | wc -l ) 
 
         fields=$( echo "$fields" | sed 's/ /|^/g' )
+        fields="^$fields"
         echo "fields::$fields"
         FILELIST=${FILELIST:-$ISSUES_DIR/*.txt}
         data=$( egrep -h $fields $FILELIST | cut -d':' -f2- )
         #echo "$data" | paste -d '|' - - - - - 
         #echo "$data" | paste -d '||||\n' - - - - -
         # pasting the lines together, paste does not let us change number of lines programmatically
+        # this approach can give errors if field order changed in some files
         ctr=0
         echo "$data" | while read LINE
         do
