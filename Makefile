@@ -1,10 +1,12 @@
 DISTFILES := bugzy.cfg README.markdown
-VERSION := 0.1.2
+#VERSION := 0.1.3
+VERSION := `cat VERSION_FILE`
  
 all: install
 
 DISTNAME=bugzy.txt-$(VERSION)
 dist: $(DISTFILES) bugzy.sh
+	echo "ver: $(VERSION)"
 	mkdir -p $(DISTNAME)
 	cp -f $(DISTFILES) $(DISTNAME)/
 	sed -e 's/@REVISION@/'$(VERSION)'/' bugzy.sh > $(DISTNAME)/bugzy.sh
