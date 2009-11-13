@@ -24,7 +24,8 @@ INSTALL_DIR=~/bin
 install:
 	#diff bugzy.cfg ~/bugzy.cfg
 	#[ bugzy.cgf -nt ~/bugzy.cfg ] && cp -i bugzy.cfg ~/
-	cp -i bugzy.cfg ~/
+	#cp -i bugzy.cfg ~/
+	cp -uv bugzy.cfg ~/
 
 	cp bugzy.sh $(INSTALL_DIR)/bugzy
 	chmod +x $(INSTALL_DIR)/bugzy
