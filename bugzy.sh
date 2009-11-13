@@ -420,7 +420,8 @@ change_status()
 common_validation()
 {
     item=$1
-    local errmsg="$2"
+    shift
+    local errmsg="$*"
     #local argct=${3:-2}
 
     #[ "$#" -ne $argct ] && die "$errmsg"
@@ -576,11 +577,10 @@ show_info4(){
 
      
 ## ADD FUNCTIONS HERE
-VERBOSE_FLAG=${VERBOSE_FLAG:-1}
 out=
 file=
 Dflag=
-while getopts hvVf:o:D:d:i: flag
+while getopts hpvVf:o:D:d:i: flag
 do
     case "$flag" in
     (h) help; exit 0;;
@@ -589,6 +589,9 @@ do
         : $(( VERBOSE_FLAG++ ))
         ;;
     (f) file="$OPTARG";;
+    p )
+        TODOTXT_PLAIN=1
+        ;;
     (o) out="$OPTARG";;
     (D) Dflag="$Dflag $OPTARG";;
     d )
@@ -601,6 +604,9 @@ do
 done
 shift $(($OPTIND - 1))
 
+# defaults if not yet defined
+VERBOSE_FLAG=${VERBOSE_FLAG:-1}
+TODOTXT_PLAIN=${TODOTXT_PLAIN:-0}
 export NONE=''
 export BLACK='\\033[0;30m'
 export RED='\\033[0;31m'
@@ -637,6 +643,14 @@ ACTION=${1:-$PROG_DEFAULT_ACTION}
 [ -z "$ACTION" ]    && usage
 # added RK 2009-11-06 11:00 to save issues (see edit)
 ISSUES_DIR=$TODO_DIR/.todos
+
+if [ $TODOTXT_PLAIN = 1 ]; then
+    PRI_A=$NONE
+    PRI_B=$NONE
+    PRI_C=$NONE
+    PRI_X=$NONE
+    DEFAULT=$NONE
+fi
 cd $ISSUES_DIR
 
 # evaluate given item numbers so grep doesn't give errors later. One can used grep -s also.
@@ -970,7 +984,7 @@ done # while true
 
     "pri" )
 
-    errmsg="usage: $TODO_SH pri ITEM# PRIORITY
+    errmsg="usage: $TODO_SH $action ITEM# PRIORITY
 note: PRIORITY must be anywhere from A to Z."
 
     [ "$#" -ne 2 ] && die "$errmsg"
@@ -994,7 +1008,7 @@ note: PRIORITY must be anywhere from A to Z."
     #fi;;
         ;;
         "depri")
-        errmsg="usage: $TODO_SH depri ITEM#"
+        errmsg="usage: $TODO_SH $action ITEM#"
         common_validation $1 $errmsg 
         get_title
         sed  -i.bak "s/^\(title: \[.*\]\) (.)/\1/" $file
@@ -1017,6 +1031,12 @@ note: PRIORITY must be anywhere from A to Z."
 #        done
         ;;
         "show" )
+        errmsg="usage: $TODO_SH show ITEM#"
+        common_validation $1 $errmsg
+        data=$( sed "s/^\([a-z0-9_]*\):\(.*\)/$PRI_A\1:$DEFAULT\2/g;" $file )
+        echo -e "$data"
+        ;;
+        "ll" | "longlist" )
         # TODO validate fields given
         # TODO titles
         fields="$*"
@@ -1024,7 +1044,7 @@ note: PRIORITY must be anywhere from A to Z."
         show_info4 $fields
         ;;
 
-        "show1" )
+        "ll1" )
         ## FASTEST
         # this uses egrep and is very fast compared to show which selects each field
         # however, no control over order of fields
@@ -1053,9 +1073,13 @@ note: PRIORITY must be anywhere from A to Z."
                 :
         done
 
+        ;;
+        "log" )
+        errmsg="usage: $TODO_SH $action ITEM#"
+        common_validation $1 $errmsg 
+        data=`extract_header $action $file`
+        echo "$data"
 
-        #| awk -F'|' 'BEGIN {OFS="|"} { print $2, $3, $4, $5, $1}'
-        #{ print $2 $3 $4 $5 $1; }'
         ;;
 
 * )
