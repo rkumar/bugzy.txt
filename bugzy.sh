@@ -891,9 +891,15 @@ done # while true
     [ -z "$status" ] && die "$errmsg"
     status=$( printf "%s\n" "$status" | tr 'A-Z' 'a-z' )
 
+    FLAG=""
+    [[ ${status:0:1} == "-" ]] && {
+       FLAG="-L"
+       status=${status:1}
+    }
+
     count=$(echo $valid | grep -c $status)
     [ $count -eq 1 ] || die "$errmsg"
-    tasks=$(grep -l -m 1 "status: *$status" $FILELIST)
+    tasks=$(grep -l -m 1 $FLAG "status: *$status" $FILELIST)
     greptitles $tasks 
     ;;
 "select" | "sel")
