@@ -281,6 +281,10 @@ log_changes()
     local newline=$3
     local file=$4
     local now=`date '+%Y-%m-%d %H:%M'`
+    [ -z "$key" ] && die "key blank"
+    [ -z "$oldvalue" ] && die "oldvalue blank"
+    [ -z "$newline" ] && die "newline blank"
+    [ -z "$file" ] && die "file blank"
     echo "- LOG,$now,$key,$oldvalue,$newline" >> $file
 
 }
@@ -574,9 +578,26 @@ show_info4(){
                 #w=$RESULT
                 #str="$str "$(printf "%-*s" $w "$f" )" |"
     }
-
-     
-## ADD FUNCTIONS HERE
+add_comment(){
+    RESULT=0 
+                echo "Enter new comment:"
+                read input
+                [ -z "$input" ] || {
+                    start=$(sed -n "/^$reply:/=" $file)
+                    [ -z "$reply" ] && die "No section for $reply found in $file"
+                    now=`date '+%Y-%m-%d %H:%M'`
+                    text="- $now: $input"
+ex - $file<<!
+${start}a
+$text
+.
+x
+!
+        log_changes "$action" "${input:0:15} ..." "${#input} chars" "$file"
+        RESULT=1 
+    }
+}
+## ADD FUNCTIONS ABOVE
 out=
 file=
 Dflag=
@@ -834,26 +855,15 @@ EndUsage
                 }
             ;;
             "comment" )
-            # CCC
-                echo "Enter new $reply:"
-                read input
-                [ -z "$input" ] || {
-                    start=$(sed -n "/^$reply:/=" $file)
-                    now=`date '+%Y-%m-%d %H:%M'`
-                    text="- $now: $input"
-ex - $file<<!
-${start}a
-$text
-.
-x
-!
-        log_changes $reply "${input:0:15} ..." "${#input} chars" "$file"
-                   let modified+=1
-    }
+                   cp $file $file.bak
+                add_comment
+                [ $RESULT -gt 0 ] && {
+                    show_diffs
+                    let modified+=1
+                }
+
                 ;;
             "description" | "fix" )
-            # FIXME single line keys like title bonking
-            # i print them on next line, since i don't know they were on same row.
                 description=`extract_header $reply $file`
                 oldvalue=$description
                 lines=$(echo "$description"  | wc -l)
@@ -1074,12 +1084,23 @@ note: PRIORITY must be anywhere from A to Z."
         done
 
         ;;
-        "log" )
+        "viewlog" | "viewcomment" )
         errmsg="usage: $TODO_SH $action ITEM#"
         common_validation $1 $errmsg 
-        data=`extract_header $action $file`
+        field=${action:4}
+        data=`extract_header $field $file`
         echo "$data"
 
+        ;;
+        "comment" | "addcomment" )
+        errmsg="usage: $TODO_SH $action ITEM#"
+        common_validation $1 $errmsg 
+        reply="comment"
+
+        add_comment
+                [ $RESULT -gt 0 ] && {
+                    show_diffs
+                }
         ;;
 
 * )
