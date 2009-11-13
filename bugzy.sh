@@ -57,7 +57,10 @@ die()
 }
 cleanup()
 {
+    echo "cleanup $file"
     [ -f "$TMP_FILE" ] && rm "$TMP_FILE"
+    bak="$file.bak"
+    [[ ! -z "$bak" && -f "$bak" ]] && rm "$bak"
     exit 0
 }
 ask()
@@ -893,6 +896,7 @@ x
     echo " "
     }
     show_diffs $file $file.bak.1 
+    rm $file.bak.1
                 }
                 
                 ;;
@@ -1101,6 +1105,7 @@ note: PRIORITY must be anywhere from A to Z."
                 [ $RESULT -gt 0 ] && {
                     show_diffs
                 }
+        cleanup
         ;;
 
 * )
