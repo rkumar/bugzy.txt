@@ -72,9 +72,14 @@ The above example relies on shell expansion, if supported by your shell.
    b show 106    # shows the bug 106, with colors 
    b -p show 106  # show the bug in plain (no colors)
 
-"log" item#
+"viewlog" item#
 
   b log 108  # displays logs of 108
+
+"viewcomment" item#    # view comments for a item
+
+"addcomment" item#    # add a comment
+
 
 TO ADD MORE HERE.
 
