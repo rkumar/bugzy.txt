@@ -5,10 +5,7 @@
 # rkumar                                                #
 # $Id$  #
 #*******************************************************#
-## TODO : AAA editing of title and other single line  - DONE for comment
-## TODO : BBB add id to format since user can edit id from title - DONE
-## TODO : CCC comment adding, no need to edit, just add
-#
+# TODO: display comments in some listing, long listing
 #
 #### --- cleanup code use at start ---- ####
 TMP_FILE=${TMPDIR:-/tmp}/prog.$$
@@ -153,7 +150,6 @@ list()
     ## Prefix the filter_command with the pre_filter_command
     filter_command="${pre_filter_command:-}"
     #echo "list 1 FILELIST: $FILELIST"
-    FILELIST=${FILELIST:-$ISSUES_DIR/*.txt}
     #echo "list 2 FILELIST: $FILELIST"
 
 
@@ -227,7 +223,6 @@ greptitles()
     #grep -h title $files | cut -d':' -f2- 
     #grep -h title $files | cut -c 8-
     FILELIST=$files
-    export FILELIST
     #echo "greptitles FILELIST: $FILELIST"
     list
 }
@@ -235,7 +230,8 @@ showtitles_where()
 {
     key=$1
     value=$2
-    tasks=$(grep -l "$key:.*$value" $ISSUES_DIR/*.txt)
+    #tasks=$(grep -l "$key:.*$value" $ISSUES_DIR/*.txt)
+    tasks=$(grep -l "$key:.*$value" $FILELIST)
     greptitles $tasks 
 }
 ## a lot of problems passing crit with spaces in it
@@ -248,7 +244,7 @@ showtitles_where_multi()
     #echo "ctr: $ctr, crit: $crit"
     local file
     local files=""
-    for file in $ISSUES_DIR/*.txt
+    for file in $FILELIST
     do
         matches=$(egrep -c "$crit"  $file)
         #echo "matches: $matches"
@@ -260,6 +256,7 @@ showtitles_where_multi()
 print_tasks()
 {
     [ -z "$FILELIST" ] && echo "No matching files" && exit 0
+#    echo "coming in with $FILELIST"
     USEPRI=${USEPRI:-$DEFAULT}
         items=$(
         grep -h  '^title:' $FILELIST \
@@ -506,7 +503,6 @@ get_display_widths()
 show_info3(){
     fields=$*
     echo "F: $fields"
-        FILELIST=${FILELIST:-$ISSUES_DIR/*.txt}
         for file in $FILELIST
         do
             str=""
@@ -527,8 +523,6 @@ show_info3(){
 show_info4(){
     fields=$*
     count=$( echo $fields | tr ' ' '\n' | wc -l ) 
-    cd $ISSUES_DIR
-        FILELIST=${FILELIST:-*.txt}
         str1=""
         declare -a widths
         ctr=0
@@ -539,13 +533,14 @@ show_info4(){
             let ctr+=1
             if [ -z "$str1" ];
             then
-                str1=$( grep "^${ii}:" *.txt )
+                str1=$( grep "^${ii}:" $FILELIST )
             else
-                str1="$str1\n"$( grep "^${ii}:" *.txt )
+                str1="$str1\n"$( grep "^${ii}:" $FILELIST )
             fi
         done
         str=""
-        for file in *.txt #$FILELIST
+        #for file in *.txt #$FILELIST
+        for file in $FILELIST
         do
             if [ -z "$str" ];
             then
@@ -583,7 +578,7 @@ VERBOSE_FLAG=${VERBOSE_FLAG:-1}
 out=
 file=
 Dflag=
-while getopts hvVf:o:D:d: flag
+while getopts hvVf:o:D:d:i: flag
 do
     case "$flag" in
     (h) help; exit 0;;
@@ -597,6 +592,8 @@ do
     d )
         PROG_CFG_FILE=$OPTARG
         ;;
+     (i) _FILES="$OPTARG"
+         ;;
     (*) usage;;
     esac
 done
@@ -628,6 +625,7 @@ export PRI_C=$CYAN    # color for C priority
 export PRI_X=$WHITE         # color for rest of them
 TODOTXT_SORT_COMMAND=${TODOTXT_SORT_COMMAND:-env LC_COLLATE=C sort -f -k3}
 
+
 [ -r "$PROG_CFG_FILE" ] || die "Fatal error: Cannot read configuration file $PROG_CFG_FILE"
 
 . "$PROG_CFG_FILE"
@@ -637,6 +635,18 @@ ACTION=${1:-$PROG_DEFAULT_ACTION}
 [ -z "$ACTION" ]    && usage
 # added RK 2009-11-06 11:00 to save issues (see edit)
 ISSUES_DIR=$TODO_DIR/.todos
+cd $ISSUES_DIR
+
+# evaluate given item numbers so grep doesn't give errors later. One can used grep -s also.
+[ -z "$_FILES" ] || {
+    comm="ls $_FILES.txt 2> /dev/null"
+    [ $VERBOSE_FLAG -gt 1 ] && echo "comm:$comm"
+    _FILES=$( eval $comm )
+    FILELIST=$_FILES
+    [ $VERBOSE_FLAG -gt 1 ] && echo "filelist:$FILELIST"
+}
+
+FILELIST=${FILELIST:-*.txt}
 #[ $# -eq 0 ] && {
 #exit 0;
 #}
@@ -872,7 +882,6 @@ done # while true
     echo "left is $*"
        cleanup;;
 "list" | "ls")
-    FILELIST=${FILELIST:-$ISSUES_DIR/*.txt}
     list "$@"
        cleanup;;
 "liststat" | "lists")
@@ -884,7 +893,7 @@ done # while true
 
     count=$(echo $valid | grep -c $status)
     [ $count -eq 1 ] || die "$errmsg"
-    tasks=$(grep -l -m 1 "status: *$status" $ISSUES_DIR/*.txt)
+    tasks=$(grep -l -m 1 "status: *$status" $FILELIST)
     greptitles $tasks 
     ;;
 "select" | "sel")
@@ -922,26 +931,23 @@ done # while true
     
     ;;
 "lbs")
-    tasks=$(grep -l "severity: critical" $ISSUES_DIR/*.txt)
+    OLDLIST=$FILELIST
+    tasks=$(grep -l "severity: critical" $FILELIST)
     #echo "tasks $tasks"
     USEPRI=$PRI_A
-    export USEPRI
     FILELIST=$tasks
-    export FILELIST
     [ -z "$FILELIST" ] || print_tasks
-    tasks=$(grep -l "severity: serious" $ISSUES_DIR/*.txt)
-    #echo "tasks $tasks"
+    FILELIST=$OLDLIST
+    tasks=$(grep -l "severity: serious" $FILELIST)
+    #echo "tasks[$tasks]"
     USEPRI=$PRI_B
-    export USEPRI
     FILELIST=$tasks
-    export FILELIST
     [ -z "$FILELIST" ] || print_tasks
-    tasks=$(grep -l "severity: normal" $ISSUES_DIR/*.txt)
-    #echo "tasks $tasks"
+    FILELIST=$OLDLIST
+    tasks=$(grep -l "severity: normal" $FILELIST)
+    #echo "tasks:$tasks:"
     USEPRI=
-    export USEPRI
     FILELIST=$tasks
-    export FILELIST
     [ -z "$FILELIST" ] || print_tasks
     ;;
     
@@ -1019,7 +1025,6 @@ note: PRIORITY must be anywhere from A to Z."
         fields=$( echo "$fields" | sed 's/ /|^/g' )
         fields="^$fields"
         echo "fields::$fields"
-        FILELIST=${FILELIST:-$ISSUES_DIR/*.txt}
         data=$( egrep -h $fields $FILELIST | cut -d':' -f2- )
         #echo "$data" | paste -d '|' - - - - - 
         #echo "$data" | paste -d '||||\n' - - - - -
