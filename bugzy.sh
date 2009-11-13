@@ -45,8 +45,66 @@ help()
           Project and context notation optional.
           Quotes optional.
 
-        addto DEST "TEXT TO ADD"
-      See "help" for more details.
+        modify NUMBER
+        mod NUMBER
+          allows user to modify various fields of a bug
+
+        edit NUMBER
+          Opens bug file in editor for editing. May be disallowed
+
+        del NUMBER [TERM]
+        rm NUMBER [TERM]
+          Deletes the item 
+
+        depri NUMBER
+        dp NUMBER
+          Deprioritizes (removes the priority) from the item
+
+        help
+          Display this help message.
+
+        list [TERM...]
+        ls [TERM...]
+          Displays all bug's that contain TERM(s) sorted by priority with line
+          numbers.  If no TERM specified, lists entire todo.txt.
+
+        longlist [Fields ...]
+        ll type id severity status title
+          Lists given fields from all files
+
+        listpri [PRIORITY]   TODO
+        lsp [PRIORITY]
+          Displays all items prioritized PRIORITY.
+          If no PRIORITY specified, lists all prioritized items.
+
+        listproj   TODO
+        lsprj
+          Lists all the projects that start with the + sign in todo.txt.
+
+        pri NUMBER PRIORITY
+        p NUMBER PRIORITY
+          Adds PRIORITY to todo on line NUMBER.  If the item is already
+          prioritized, replaces current priority with new PRIORITY.
+          PRIORITY must be an uppercase letter between A and Z.
+
+       show NUMBER
+          Displays the bug file
+
+       lbs
+          Lists bugs by severity.
+
+       select key value
+       sel status started
+       sel severity critical
+          lists titles for a key and value
+          keys are  status date_created severity type
+
+       selectm "type: bug" "status: open" ...
+       selm "type=bug" "status=(open|started)" "severity=critical"
+          A multiple criteria search.
+
+
+
 EndHelp
     exit 0
 }
@@ -57,7 +115,6 @@ die()
 }
 cleanup()
 {
-    echo "cleanup $file"
     [ -f "$TMP_FILE" ] && rm "$TMP_FILE"
     bak="$file.bak"
     [[ ! -z "$bak" && -f "$bak" ]] && rm "$bak"
@@ -935,6 +992,8 @@ done # while true
     greptitles $tasks 
     ;;
 "select" | "sel")
+    ## lists titles for a key and value
+    ## keys are  status date_created severity type
     valid="|status|date_created|severity|type|"
     errmsg="usage: $TODO_SH $action $valid"
     key=$1
