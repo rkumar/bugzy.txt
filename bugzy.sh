@@ -6,6 +6,8 @@
 # $Id$  #
 #*******************************************************#
 # TODO: display comments in some listing, long listing
+# TODO: validate fields in show
+# TODO - rename show. this should show one bug or full file
 #
 #### --- cleanup code use at start ---- ####
 TMP_FILE=${TMPDIR:-/tmp}/prog.$$
@@ -231,7 +233,7 @@ showtitles_where()
     key=$1
     value=$2
     #tasks=$(grep -l "$key:.*$value" $ISSUES_DIR/*.txt)
-    tasks=$(grep -l "$key:.*$value" $FILELIST)
+    tasks=$(grep -l "^$key:.*$value" $FILELIST)
     greptitles $tasks 
 }
 ## a lot of problems passing crit with spaces in it
@@ -901,7 +903,7 @@ done # while true
 
     count=$(echo $valid | grep -c $status)
     [ $count -eq 1 ] || die "$errmsg"
-    tasks=$(grep -l -m 1 $FLAG "status: *$status" $FILELIST)
+    tasks=$(grep -l -m 1 $FLAG "^status: *$status" $FILELIST)
     greptitles $tasks 
     ;;
 "select" | "sel")
@@ -940,19 +942,19 @@ done # while true
     ;;
 "lbs")
     OLDLIST=$FILELIST
-    tasks=$(grep -l "severity: critical" $FILELIST)
+    tasks=$(grep -l -m 1 "^severity: critical" $FILELIST)
     #echo "tasks $tasks"
     USEPRI=$PRI_A
     FILELIST=$tasks
     [ -z "$FILELIST" ] || print_tasks
     FILELIST=$OLDLIST
-    tasks=$(grep -l "severity: serious" $FILELIST)
+    tasks=$(grep -l -m 1 "^severity: serious" $FILELIST)
     #echo "tasks[$tasks]"
     USEPRI=$PRI_B
     FILELIST=$tasks
     [ -z "$FILELIST" ] || print_tasks
     FILELIST=$OLDLIST
-    tasks=$(grep -l "severity: normal" $FILELIST)
+    tasks=$(grep -l -m 1 "^severity: normal" $FILELIST)
     #echo "tasks:$tasks:"
     USEPRI=
     FILELIST=$tasks
