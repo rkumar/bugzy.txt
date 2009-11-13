@@ -45,35 +45,55 @@ select (based on a key), show.
 Actions to directly change status are open, started, closed, canceled, stopped or the first 3 letter of each.
 
 "selectm" or "selm" is a multiple criteria search as:
-    bugzy selectm "type: bug" "status: open" ...
-    bugzy selectm "type=bug" "status=(open|started)" "severity=critical"
+
+   > bugzy selectm "type: bug" "status: open" ...  
+
+   > bugzy selectm "type=bug" "status=(open|started)" "severity=critical"  
+
 
 "pri" adds a priority to as task or bug, which results in a change in color, and having it 
 sorted above. "depri" removes priority.
 
 "liststat" lists tasks for a given status (|open|closed|started|stopped|canceled|).
 
-"show" field1 field2 ... (lists the given fields for all tasks)
+"longlist" (or "ll" field1 field2 ... (lists the given fields for all tasks)
+
+Bugs displayed may be restricted to some numbers using the "-i" flag.
+e.g.
+
+    b -i '106 107 109 110}' longlist
+    b -i '{106..118}' ll
+    b -v -i '!(106)' ll
+
+The above example relies on shell expansion, if supported by your shell.
+
+"show" item#
+  
+   b show 106    # shows the bug 106, with colors 
+   b -p show 106  # show the bug in plain (no colors)
+
+"log" item#
+
+  b log 108  # displays logs of 108
 
 TO ADD MORE HERE.
 
-You may also alias bugzy to "b" in ~/.bashrc or equivalent:
+You may also alias bugzy to "b" in ~/.bashrc or equivalent.
 
-    > `alias b='bugzy -d ~/bugzy.cfg'`  
-    > `b add "Module aaa crashes on startup"`  
-    > `b list`  
-    > `b mod 1`  
-    > `b start 1`  
-    > `b cancel 1`  
-    > `b close 1`  
-    > `b show`  
-    > `b add "Module bbb crashes on startup"`  
-    > `b pri 2 A`  
-    > `b`  
-    > `b depri 2`  
-    > `b`  
+    > alias b='bugzy -d ~/bugzy.cfg'  
+    > b add "Module aaa crashes on startup"  
+    > b list  
+    > b mod 1  
+    > b start 1  
+    > b cancel 1  
+    > b close 1  
+    > b show  
+    > b add "Module bbb crashes on startup"  
+    > b pri 2 A  
+    > b  
+    > b depri 2  
+    > b  
 
-     
  
 
 Others
