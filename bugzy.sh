@@ -885,12 +885,14 @@ done # while true
     list "$@"
        cleanup;;
 "liststat" | "lists")
+   ## if - is given, e.g. -open, then all but open are shown
     valid="|open|closed|started|stopped|canceled|"
     errmsg="usage: $TODO_SH $action $valid"
     status=$1
     [ -z "$status" ] && die "$errmsg"
     status=$( printf "%s\n" "$status" | tr 'A-Z' 'a-z' )
 
+    ## all except given status
     FLAG=""
     [[ ${status:0:1} == "-" ]] && {
        FLAG="-L"
