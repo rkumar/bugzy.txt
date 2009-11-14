@@ -715,6 +715,7 @@ hash_data(){
     }
     done
 }
+## print titles of CSV file
 tsvtitles(){
     #sed '1q' "$TSV_FILE"
     cat "$TSV_TITLES_FILE"
@@ -1123,6 +1124,53 @@ done # while true
         let ctr+=1
     done
     showtitles_where_multi "$crit" $ctr
+    
+    ;;
+    # XXX
+"tsvselectm" | "tsvselm")
+    valid="|status|date_created|severity|type|"
+    errmsg="usage: $TODO_SH $action \"type: bug\" \"status: open\" ..."
+    [ -z "$1" ] && die "$errmsg"
+    #[ -z "$key" ] && die "$errmsg"
+    #[ -z "$value" ] && die "$errmsg"
+    #key=$( printf "%s\n" "$key" | tr 'A-Z' 'a-z' )
+
+    status="..."
+    type="..."
+    severity="..."
+    id="[0-9]+"
+    date_created=".{16}"
+    due_date=".{16}"
+    assigned_to=".*"
+    title="."
+
+    #echo "selm received: $#,  $*"
+    full_regex=0
+    for ii in "$@"
+    do
+        field=$( expr "$ii" : '\([a-zA-Z0-9_]*\).*' )
+        value=$( expr "$ii" : '.*[:=] *\(.*\)' )
+        [[ "$field" == "status" || $field == "severity" || "$field" == "type" ]] && {
+            value=$( printf "%s\n" "$value" | tr 'a-z' 'A-Z' )
+            value=${value:0:3}
+        }
+        case "$field" in
+            "status" ) status="$value";;
+            "severity" ) severity="$value";;
+            "type" ) type="$value";;
+            "id" ) id="$value"; full_regex=1;;
+            "assigned_to" ) assigned_to="$value"; full_regex=1;;
+            "due_date" ) due_date="$value"; full_regex=1;;
+            "date_created" ) date_created="$value"; full_regex=1;;
+            "title" ) title="$value"; full_regex=1;;
+            * ) full_regex=1;;
+        esac
+    done
+    regex="^${status}\t${severity}\t${type}\t"
+    # status  severity        type    id      date_created    assigned_to     due_date        title
+    [ $full_regex -gt 0 ] && regex+="${id}\t${date_created}\t${assigned_to}\t${due_date}\t${title}"
+    echo "regex:$regex"
+    grep -P "$regex" "$TSV_FILE"
     
     ;;
 "lbs")
