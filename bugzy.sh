@@ -20,6 +20,9 @@ Date="2009-11-06"
 DATE_FORMAT='+%Y-%m-%d %H:%M'
 arg0=$(basename "$0")
 
+TSV_FILE="data.tsv"
+TSV_TITLES_FILE="titles.tsv"
+
 #ext=${1:-"default value"}
 #today=$(date +"%Y-%m-%d-%H%M")
 
@@ -346,7 +349,9 @@ log_changes()
     [ -z "$oldvalue" ] && die "oldvalue blank"
     [ -z "$newline" ] && die "newline blank"
     [ -z "$file" ] && die "file blank"
-    echo "- LOG,$now,$key,$oldvalue,$newline" >> $file
+    data="- LOG,$now,$key,$oldvalue,$newline"
+    echo "$data" >> $file
+    echo "$data" >> $item.log.txt
 
 }
 ## get_code "type"
@@ -656,6 +661,7 @@ x
 !
         log_changes "$action" "${input:0:15} ..." "${#input} chars" "$file"
         RESULT=1 
+        echo "$text" >> $item.comment.txt
     }
 }
 ## returns field value given a field
@@ -708,6 +714,10 @@ hash_data(){
         hash_set "DATA" "$field" "$value"
     }
     done
+}
+tsvtitles(){
+    #sed '1q' "$TSV_FILE"
+    cat "$TSV_TITLES_FILE"
 }
 
 
@@ -888,7 +898,7 @@ EndUsage
       tabseve=$( echo ${i_severity:0:3} | tr "a-z" "A-Z" )
       tabtype=$( echo ${i_type:0:3} | tr "a-z" "A-Z" )
       tabfields="$tabstat${del}$tabseve${del}$tabtype${del}$serialid${del}$now${del}$ASSIGNED_TO${del}$i_due_date${del}$todo"
-      echo "$tabfields" >> data.tsv
+      echo "$tabfields" >> "$TSV_FILE"
       [ ! -z "$i_desc" ] && echo "$i_desc" > $serialid.description.txt
 
     process_quadoptions  "$SEND_EMAIL" "Send file by email?"
@@ -1015,6 +1025,9 @@ x
     cat $file | sed 's/^/> /'
     echo " "
     }
+    # tsv stuff
+    echo "$text" > $item.$reply.txt
+
     show_diffs $file $file.bak.1 
     rm $file.bak.1
                 }
@@ -1053,6 +1066,28 @@ done # while true
     [ $count -eq 1 ] || die "$errmsg"
     tasks=$(grep -l -m 1 $FLAG "^status: *$status" $FILELIST)
     greptitles $tasks 
+    ;;
+    # XXX
+    "tsvlists" )
+    valid="|OPE|CLO|STA|STO|CAN|"
+    errmsg="usage: $TODO_SH $action $valid"
+    status=$1
+    [ -z "$status" ] && die "$errmsg"
+    status=$( printf "%s\n" "$status" | tr 'a-z' 'A-Z' )
+
+    ## all except given status
+    FLAG=""
+    [[ ${status:0:1} == "-" ]] && {
+       FLAG="-v"
+       status=${status:1}
+    }
+    status=${status:0:3}
+
+    count=$(echo $valid | grep -c $status)
+    [ $count -eq 1 ] || die "$errmsg"
+    #tasks=$(grep -l -m 1 $FLAG "^status: *$status" $FILELIST)
+    tsvtitles
+    grep -P $FLAG "^$status\t" "$TSV_FILE"
     ;;
 "select" | "sel")
     ## lists titles for a key and value
@@ -1219,6 +1254,7 @@ note: PRIORITY must be anywhere from A to Z."
 
         ;;
         "comment" | "addcomment" )
+        cp $file $file.bak
         errmsg="usage: $TODO_SH $action ITEM#"
         common_validation $1 $errmsg 
         reply="comment"
