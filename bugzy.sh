@@ -153,7 +153,7 @@ function hash_get_into {
 }
 
 
-# Emulates:  echo hash[key]
+# Emulates:  echo ha[key]
 #
 # Params:
 # 1 - hash
@@ -165,6 +165,7 @@ function hash_echo {
 hash_set "VALUES" "status" "open closed started stopped canceled "
 hash_set "VALUES" "severity" "normal critical serious"
 hash_set "VALUES" "type" "bug feature enhancement task"
+hash_set "DATA" "title" "dummY"
 edit_tmpfile()
 {
             mtime=`stat -c %Y $TMP_FILE`
@@ -393,9 +394,9 @@ convert_due_date()
    if [ ${input:0:1} == '+' ];
    then
        input=${input:1}
-       result=$(date --date "$ginput" "$DATE_FORMAT")
+       result=$(date --date "$input" "$DATE_FORMAT")
    else
-       result=$ginput
+       result=$input
    fi
    echo "$result"
 }
@@ -441,7 +442,7 @@ get_value_for_id()
 {
     local file=$ISSUES_DIR/$1.txt
     local key=$2
-    [ -z "$2" ] && die "get_value requires 2 params"
+    [ -z "$2" ] && die "get_value_for_id requires 2 params"
     local oldvalue=$(grep -m 1 "^$key:" $file | cut -d':' -f2-)
     oldvalue=${oldvalue## }
     echo "$oldvalue"
@@ -450,7 +451,7 @@ get_value_from_file()
 {
     local file=$1
     local key=$2
-    [ -z "$2" ] && die "get_value requires 2 params"
+    [ -z "$2" ] && die "get_value_from_file requires 2 params"
     local oldvalue=$(grep -m 1 "^$key:" $file | cut -d':' -f2-)
     oldvalue=${oldvalue## }
     echo "$oldvalue"
@@ -657,6 +658,59 @@ x
         RESULT=1 
     }
 }
+## returns field value given a field
+## please pipe data of a file to this.
+get_value(){
+    key=$1
+    let len=${#key}+3
+    #RESULT=$( grep -m 1 "^$key:" | cut -c ${len}- )
+    grep -m 1 "^$key:" | cut -c ${len}-
+}
+get_value_from_line(){
+    cut -d':' -f2-
+}
+
+get_field_index(){
+    case $field in
+        "title" ) echo 1;;
+        "type" ) echo 2;;
+        "severity" ) echo 3;;
+        "status" ) echo 4;;
+        "id" ) echo 7;;
+        "date_created" ) echo 8;;
+        "due_date" ) echo 9;;
+        "assigned_to" ) echo 10;;
+        *) echo 0
+    esac
+}
+array_data(){
+    data="$*"
+    declare -a field_array
+    export field_array
+    echo "$data" | while read LINE
+    do
+        #field=$( get_value_from_line "$data" )
+        field=$( expr "$LINE" : '^\(.*\):' )
+        value=$( expr "$LINE" : '.*: \(.*\)' )
+        index=$( get_field_index $field )
+        #[ $index -gt 0 ] && field_array[ $index ]=$value
+        field_array[ $index ]=$value
+    done
+}
+hash_data(){
+    data="$*"
+    echo "$data" | while read LINE
+    do
+        field=$( expr "$LINE" : '^\([a-z_0-9]*\):' )
+        [ -z "$field" ] || {
+        value=$( expr "$LINE" : '.*: \(.*\)' )
+        #echo "setting:$field. to:$value:"
+        hash_set "DATA" "$field" "$value"
+    }
+    done
+}
+
+
 ## ADD FUNCTIONS ABOVE
 out=
 file=
@@ -826,8 +880,17 @@ case $action in
     log:
 
 EndUsage
-    $EDITOR $editfile
+    #$EDITOR $editfile
     fi
+    ## save as tab delimited -- trying out
+      del="	"
+      tabstat=$( echo ${i_status:0:3} | tr "a-z" "A-Z" )
+      tabseve=$( echo ${i_severity:0:3} | tr "a-z" "A-Z" )
+      tabtype=$( echo ${i_type:0:3} | tr "a-z" "A-Z" )
+      tabfields="$tabstat${del}$tabseve${del}$tabtype${del}$serialid${del}$now${del}$ASSIGNED_TO${del}$i_due_date${del}$todo"
+      echo "$tabfields" >> data.tsv
+      [ ! -z "$i_desc" ] && echo "$i_desc" > $serialid.description.txt
+
     process_quadoptions  "$SEND_EMAIL" "Send file by email?"
     #[ $RESULT == "yes" ] && get_input "emailid" "$ASSIGNED_TO"
     [ "$RESULT" == "yes" ] && {
@@ -1166,6 +1229,58 @@ note: PRIORITY must be anywhere from A to Z."
                 }
         cleanup
         ;;
+        "upcoming" | "upc" )
+            tasks=$(egrep -l -m 1 $FLAG "^status: (started|open)" $FILELIST)
+            RESULT="ax"
+            export RESULT
+            for ii in $tasks
+            do
+                data=$( cat $ii )
+                #echo "$data" | grep -m 1 "^due_date:" | cut -d':' -f2-
+                due_date=$( echo "$data" | get_value "due_date" )
+                itype=$( echo "$data" | get_value "type" )
+                severity=$( echo "$data" | get_value "severity" )
+                title=$( echo "$data" | get_value "title" )
+                status=$( echo "$data" | get_value "status" )
+                #echo "$data" | get_value "date_created"
+                #echo "$RESULT"
+                [ -z "$due_date" ] && due_date="                "
+                echo "$ii $due_date ${status:0:3} ${severity:0:3} ${itype:0:3} $title"
+            done
+            ;;
+        "upcoming2" | "upc2" )
+            tasks=$(egrep -l -m 1 $FLAG "^status: (started|open)" $FILELIST)
+            for ii in $tasks
+            do
+                data=$( cat $ii )
+#                array_data "$data"
+#                itype=${field_array[ $( get_field_index "type" ) ]}
+#                severity=${field_array[ $( get_field_index "severity" ) ]}
+#                status=${field_array[ $( get_field_index "status" ) ]}
+#                title=${field_array[ $( get_field_index "title" ) ]}
+    #             hash_data "$data"
+    echo "$data" | while read LINE
+    do
+        field=$( expr "$LINE" : '^\([a-z_0-9]*\):' )
+        [ -z "$field" ] || {
+        value=$( expr "$LINE" : '.*: \(.*\)' )
+        echo "setting:$field: to:$value:"
+        hash_set "DATA" "$field" "$value"
+        hash_echo "DATA" "type"
+    }
+    done
+                 itype=`hash_echo "DATA" "type"`
+                 severity=$( hash_echo "DATA" "severity" )
+                 hash_echo "DATA" "severity"
+                 due_date=$( hash_echo "DATA" "due_date" )
+                 title=$( hash_echo "DATA" "title" )
+                 status=$( hash_echo "DATA" "status" )
+
+                [ -z "$due_date" ] && due_date="                "
+                echo "$ii $due_date ${status:0:3} ${severity:0:3} ${itype:0:3} $title"
+            done
+            ;;
+
 
 * )
     usage
