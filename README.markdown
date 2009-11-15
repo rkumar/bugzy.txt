@@ -11,6 +11,8 @@ Mails are sent using the 'mail' command if specified.
 
 Currently, it is very new, help is not documented, just wait a week or 3 before using.
 
+I am now testing out a tab delimited format which seems to give far better query and search 
+performance than the earlier key value format which was hard to multiple search on.
 
 Downloads
 ---------
