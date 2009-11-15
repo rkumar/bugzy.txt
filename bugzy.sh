@@ -131,7 +131,9 @@ ask()
         return
     done
 }
-
+## XXX CAN ONLY BE USED GLOBALLY
+## will NOT work in echo | while read LINE
+## instead use for LINE in $( echo -e "$data" )
 Hash_config_varname_prefix=__hash__
 
 # Emulates:  hash[key]=value
@@ -165,10 +167,28 @@ function hash_get_into {
 function hash_echo {
     eval "echo $3 \"\$${Hash_config_varname_prefix}${1}_${2}\""
 }
+# Emulates something similar to:
+#   foreach($hash as $key => $value) { fun($key,$value); }
+#
+# It is possible to write different variations of this function.
+# Here we use a function call to make it as "generic" as possible.
+#
+# Params:
+# 1 - hash
+# 2 - function name
+function hash_foreach {
+  local keyname oldIFS="$IFS"
+  IFS=' '
+  for i in $(eval "echo \${!${Hash_config_varname_prefix}${1}_*}"); do
+    keyname=$(eval "echo \${i##${Hash_config_varname_prefix}${1}_}")
+    eval "$2 $keyname \"\$$i\""
+  done
+IFS="$oldIFS"
+}
+
 hash_set "VALUES" "status" "open closed started stopped canceled "
 hash_set "VALUES" "severity" "normal critical serious"
 hash_set "VALUES" "type" "bug feature enhancement task"
-hash_set "DATA" "title" "dummY"
 edit_tmpfile()
 {
             mtime=`stat -c %Y $TMP_FILE`
@@ -703,16 +723,42 @@ array_data(){
         field_array[ $index ]=$value
     done
 }
+# uses global hash to hash file data
+# very likely to carry over value of previous row into next if next key not present
 hash_data(){
     data="$*"
-    echo "$data" | while read LINE
+    #echo "$data" | while read LINE
+    lastfield="dummy"
+            firstline=0
+    IFS=$'\n'
+    for LINE in $( echo "$data" )
     do
+        #echo "LINE:$LINE"
         field=$( expr "$LINE" : '^\([a-z_0-9]*\):' )
-        [ -z "$field" ] || {
-        value=$( expr "$LINE" : '.*: \(.*\)' )
-        #echo "setting:$field. to:$value:"
-        hash_set "DATA" "$field" "$value"
-    }
+        if [ ! -z "$field" ];
+        then
+            lastfield=$field
+            value=$( expr "$LINE" : '.*: \(.*\)' )
+            #echo "setting:$field. to:$value."
+            hash_set "DATA" "$field" "$value"
+            firstline=1
+        else
+            value=`hash_echo "DATA" "$lastfield"`
+            if [ $firstline -gt 0 ];
+            then
+                if [ -z "$value" ];
+                then
+                    value="$LINE"
+                else
+                    value+="\n$LINE"
+                fi
+            else
+                value+="\n$LINE"
+            fi
+            hash_set "DATA" "$lastfield" "$value"
+            firstline=0
+        fi
+    
     done
 }
 ## print titles of CSV file
@@ -1300,6 +1346,40 @@ note: PRIORITY must be anywhere from A to Z."
         data=$( sed "s/^\([a-z0-9_]*\):\(.*\)/$PRI_A\1:$DEFAULT\2/g;" $file )
         echo -e "$data"
         ;;
+        "tsvshow" )
+        errmsg="usage: $TODO_SH show ITEM#"
+        common_validation $1 $errmsg
+        declare -a headers
+        let ctr=0
+        titles=$( tsvtitles | tr '\t' ' ' )
+        for LINE in $titles
+        do
+            headers[$ctr]=$LINE
+            let ctr+=1
+        done
+        paditem=$( printf "%4s" $item )
+        rowdata=$( grep "^$paditem" "$TSV_FILE" | tr '\t' '\n' )
+        rowdata=$( grep "^$paditem" "$TSV_FILE" )
+        let ctr=0
+        #echo "$rowdata" | while read field
+        IFS='	'
+        for field in $( echo -e "$rowdata"  )
+        do
+            echo "${headers[$ctr]}: $field"
+            hash_set "rowdata" "${headers[$ctr]}" "$field"
+
+            let ctr+=1
+        done
+        xfields="description fix comments log"
+        for xfile in $xfields
+        do
+            dfile="${item}.${xfile}.txt" 
+            [ -f "$dfile" ] && { 
+            echo "$xfile :" ; cat "$dfile" 
+        }
+        done
+
+        ;;
         "ll" | "longlist" )
         # TODO validate fields given
         # TODO titles
@@ -1378,7 +1458,9 @@ note: PRIORITY must be anywhere from A to Z."
             done
             ;;
         "upcoming2" | "upc2" )
+        # uses hash_data but is slow
             tasks=$(egrep -l -m 1 $FLAG "^status: (started|open)" $FILELIST)
+            output=""
             for ii in $tasks
             do
                 data=$( cat $ii )
@@ -1387,27 +1469,21 @@ note: PRIORITY must be anywhere from A to Z."
 #                severity=${field_array[ $( get_field_index "severity" ) ]}
 #                status=${field_array[ $( get_field_index "status" ) ]}
 #                title=${field_array[ $( get_field_index "title" ) ]}
-    #             hash_data "$data"
-    echo "$data" | while read LINE
-    do
-        field=$( expr "$LINE" : '^\([a-z_0-9]*\):' )
-        [ -z "$field" ] || {
-        value=$( expr "$LINE" : '.*: \(.*\)' )
-        echo "setting:$field: to:$value:"
-        hash_set "DATA" "$field" "$value"
-        hash_echo "DATA" "type"
-    }
-    done
+                 hash_data "$data"
                  itype=`hash_echo "DATA" "type"`
                  severity=$( hash_echo "DATA" "severity" )
-                 hash_echo "DATA" "severity"
                  due_date=$( hash_echo "DATA" "due_date" )
                  title=$( hash_echo "DATA" "title" )
                  status=$( hash_echo "DATA" "status" )
+                 #desc=$( hash_echo "DATA" "description" )
+                 #echo "$ii"
+                 #echo -e "$desc"
 
                 [ -z "$due_date" ] && due_date="                "
-                echo "$ii $due_date ${status:0:3} ${severity:0:3} ${itype:0:3} $title"
+                #echo "$ii\t$due_date\t${status:0:3}\t${severity:0:3}\t${itype:0:3} $title"
+                output+="$ii\t$due_date\t${status:0:3}\t${severity:0:3}\t${itype:0:3} $title\n"
             done
+            echo -e "$output" | sort -k2
             ;;
 
 
