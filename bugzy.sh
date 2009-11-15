@@ -8,6 +8,7 @@
 # TODO: display comments in some listing, long listing
 # TODO: validate fields in show
 # TODO - rename show. this should show one bug or full file
+# TODO - put col widths in hash
 #
 #### --- cleanup code use at start ---- ####
 TMP_FILE=${TMPDIR:-/tmp}/prog.$$
@@ -615,6 +616,7 @@ show_info3(){
     # TODO : add titles and how many rows displayed
 show_info4(){
     fields=$*
+    echo "fields:$fields"
     count=$( echo $fields | tr ' ' '\n' | wc -l ) 
         str1=""
         declare -a widths
@@ -624,6 +626,7 @@ show_info4(){
             get_display_widths $ii
             widths[$ctr]=$RESULT
             let ctr+=1
+            # grep the fields from the files
             if [ -z "$str1" ];
             then
                 str1=$( grep "^${ii}:" $FILELIST )
@@ -633,6 +636,7 @@ show_info4(){
         done
         str=""
         #for file in *.txt #$FILELIST
+        # now grep out each file from the combined data
         for file in $FILELIST
         do
             if [ -z "$str" ];
@@ -647,6 +651,7 @@ show_info4(){
         echo "count: $count"
         echo -e "$str" | while read LINE
         do
+            [ -z "$LINE" ] && continue;
             #f=$( echo "$LINE" | cut -d':' -f3- )
             #    echo -n "$f | "
                 #echo -n "$LINE | "
@@ -1358,6 +1363,8 @@ note: PRIORITY must be anywhere from A to Z."
         "tsvshow" )
         errmsg="usage: $TODO_SH show ITEM#"
         common_validation $1 $errmsg
+
+        # read up the headers into an array
         declare -a headers
         let ctr=0
         titles=$( tsvtitles | tr '\t' ' ' )
@@ -1369,9 +1376,11 @@ note: PRIORITY must be anywhere from A to Z."
         paditem=$( printf "%4s" $item )
         #rowdata=$( grep "^$paditem" "$TSV_FILE" | tr '\t' '\n' )
         rowdata=$( grep "^$paditem" "$TSV_FILE" )
-        let ctr=0
         #echo "$rowdata" | while read field
+
+        # put fields into hash so we can change the order
         OLDIFS=$IFS
+        let ctr=0
         IFS=$'\t'
         for field in $( echo -e "$rowdata"  )
         do
@@ -1380,6 +1389,7 @@ note: PRIORITY must be anywhere from A to Z."
             let ctr+=1
         done
         IFS=$OLDIFS
+        ## we need to print iit in the following order
         xfields="title id status severity type assigned_to date_created due_date"
         for xfile in $xfields
         do
@@ -1389,6 +1399,7 @@ note: PRIORITY must be anywhere from A to Z."
             hash_echo "rowdata" "$xfile"
         done
         echo
+        # read up the files containing multiline data
         xfields="description fix comment log"
         for xfile in $xfields
         do
@@ -1418,15 +1429,55 @@ note: PRIORITY must be anywhere from A to Z."
         fields="$*"
         fields=${fields:-"id status severity type title"}
         count=$( echo $fields | tr ' ' '\n' | wc -l ) 
+        #count=$#
+        ff=""
+        for f in $fields
+        do
+            ff+="|^$f"
+        done
+        fields=$( echo $ff | cut -c2- )
 
-        fields=$( echo "$fields" | sed 's/ /|^/g' )
-        fields="^$fields"
+        #fields=$( echo "$fields" | sed 's/ /|^/g' )
+        #fields="^$fields"
         echo "fields::$fields"
-        data=$( egrep -h $fields $FILELIST | cut -d':' -f2- )
+        data=$( egrep -h "$fields" $FILELIST | cut -d':' -f2- )
         #echo "$data" | paste -d '|' - - - - - 
         #echo "$data" | paste -d '||||\n' - - - - -
         # pasting the lines together, paste does not let us change number of lines programmatically
         # this approach can give errors if field order changed in some files
+        ctr=0
+        echo "$data" | while read LINE
+        do
+                echo -n "$LINE | "
+                let ctr+=1
+                if [ $ctr -eq $count ];
+                then
+                    ctr=0
+                    echo ""
+                fi
+                :
+        done
+
+        ;;
+        "ll2" )
+        # this uses egrep and is very fast compared to show which selects each field
+        # however, no control over order of fields
+        fields="$*"
+        fields=${fields:-"id status severity type title"}
+        count=$( echo $fields | tr ' ' '\n' | wc -l ) 
+        ctr=0
+        seds=""
+        for f in $fields
+        do
+            seds+="s/:$f:/:$ctr:/g;"
+            let ctr+=1
+        done
+        echo "seds:$seds"
+
+        fields=$( echo "$fields" | sed 's/ /|^/g' )
+        fields="^$fields"
+        echo "fields::$fields"
+        data=$( egrep "$fields" $FILELIST | sed $seds | sort | cut -d':' -f3- )
         ctr=0
         echo "$data" | while read LINE
         do
