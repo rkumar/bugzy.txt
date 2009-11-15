@@ -21,7 +21,7 @@ DATE_FORMAT='+%Y-%m-%d %H:%M'
 arg0=$(basename "$0")
 
 TSV_FILE="data.tsv"
-TSV_TITLES_FILE="titles.tsv"
+#TSV_TITLES_FILE="titles.tsv"
 
 #ext=${1:-"default value"}
 #today=$(date +"%Y-%m-%d-%H%M")
@@ -718,9 +718,16 @@ hash_data(){
 ## print titles of CSV file
 tsvtitles(){
     #sed '1q' "$TSV_FILE"
-    cat "$TSV_TITLES_FILE"
+    echo "id	status	severity	type	assigned_to	date_created	due_date	title"
+    #cat "$TSV_TITLES_FILE"
 }
-
+## color the given data
+## please set USE_PRI before calling else it will use $PRI_A
+color_line(){
+    USE_PRI=${USE_PRI:-"$PRI_A"}
+    idata=$( sed 's/\(.*\)/'$USE_PRI'\1'${DEFAULT}'/g;' )
+    echo -e  "$idata"
+}
 
 ## ADD FUNCTIONS ABOVE
 out=
@@ -778,6 +785,13 @@ export PRI_B=$GREEN         # color for B priority
 export PRI_C=$CYAN    # color for C priority
 export PRI_X=$WHITE         # color for rest of them
 TODOTXT_SORT_COMMAND=${TODOTXT_SORT_COMMAND:-env LC_COLLATE=C sort -f -k3}
+REG_ID="^...."
+REG_STATUS="..."
+REG_SEVERITY="..."
+REG_TYPE="..."
+REG_DUE_DATE=".{16}"
+REG_DATE_CREATED=".{16}"
+REG_ASSIGNED_TO=".{10}"
 
 
 [ -r "$PROG_CFG_FILE" ] || die "Fatal error: Cannot read configuration file $PROG_CFG_FILE"
@@ -827,6 +841,7 @@ case $action in
     else
         atitle=$*
     fi
+    [ -z "$atitle" ] && die "Title required for bug"
     [ "$PROMPT_DESC" == "yes" ] && {
         echo -n "Enter a description: "
         read i_desc
@@ -867,9 +882,12 @@ case $action in
     ASSIGNED_TO=$( printf "%-10s" "$ASSIGNED_TO" )
     ASSIGNED_TO=${ASSIGNED_TO:0:10}
 
+    short_type=$( echo "${i_type:0:1}" | tr 'a-z' 'A-Z' )
+
     serialid=`incr_id`
-    task="[Task #$serialid]"
+    task="[$short_type #$serialid]"
     todo="$task $atitle"
+    tabtitle="[#$serialid] $atitle"
     [ -d "$ISSUES_DIR" ] || mkdir "$ISSUES_DIR"
     editfile=$ISSUES_DIR/${serialid}.txt
     if [ -f $editfile ];
@@ -905,7 +923,7 @@ EndUsage
       tabid=$( printf "%4s" "$serialid" )
       
       #tabfields="$tabstat${del}$tabseve${del}$tabtype${del}$serialid${del}$now${del}$ASSIGNED_TO${del}$i_due_date${del}$todo"
-      tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$now${del}$i_due_date${del}$todo"
+      tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$now${del}$i_due_date${del}$tabtitle"
       echo "$tabfields" >> "$TSV_FILE"
       [ ! -z "$i_desc" ] && echo "$i_desc" > $serialid.description.txt
 
@@ -916,6 +934,7 @@ EndUsage
         #"cat $file | mail -s $title  "
         [ ! -z "$EMAIL_TO" ] && cat "$editfile" | mail -s "$todo" $EMAIL_TO
     }
+    echo "Created $serialid"
 
        cleanup;;
 "del" | "rm")
@@ -1095,7 +1114,7 @@ done # while true
     [ $count -eq 1 ] || die "$errmsg"
     #tasks=$(grep -l -m 1 $FLAG "^status: *$status" $FILELIST)
     tsvtitles
-    grep -P $FLAG "^$status\t" "$TSV_FILE"
+    grep -P $FLAG "^....\t$status\t" "$TSV_FILE"
     ;;
 "select" | "sel")
     ## lists titles for a key and value
@@ -1145,10 +1164,10 @@ done # while true
     status="..."
     type="..."
     severity="..."
-    id="[0-9]+"
+    id=".{4}"
     date_created=".{16}"
     due_date=".{16}"
-    assigned_to=".*"
+    assigned_to=".{10}"
     title="."
 
     #echo "selm received: $#,  $*"
@@ -1165,7 +1184,7 @@ done # while true
             "status" ) status="$value";;
             "severity" ) severity="$value";;
             "type" ) type="$value";;
-            "id" ) id="$value"; full_regex=1;;
+            "id" ) id="$value"; ;;
             "assigned_to" ) assigned_to="$value"; full_regex=1;;
             "due_date" ) due_date="$value"; full_regex=1;;
             "date_created" ) date_created="$value"; full_regex=1;;
@@ -1173,9 +1192,9 @@ done # while true
             * ) full_regex=1;;
         esac
     done
-    regex="^${status}\t${severity}\t${type}\t"
-    # status  severity        type    id      date_created    assigned_to     due_date        title
-    [ $full_regex -gt 0 ] && regex+="${id}\t${date_created}\t${assigned_to}\t${due_date}\t${title}"
+    regex="^${id}\t${status}\t${severity}\t${type}\t"
+    #id  status  severity        type    assigned_to     date_created    due_date        title
+    [ $full_regex -gt 0 ] && regex+="${assigned_to}\t${date_created}\t${due_date}\t${title}"
     echo "regex:$regex"
     tsvtitles
     grep -P "$regex" "$TSV_FILE"
@@ -1201,7 +1220,25 @@ done # while true
     FILELIST=$tasks
     [ -z "$FILELIST" ] || print_tasks
     ;;
+"tsvlbs")
+    tsvtitles
+    words="CRI SER NOR"
+    ctr=1
+    for ii in $words
+    do
+        regex="^${REG_ID}\t${REG_TYPE}\t$ii"
+        case $ctr in
+            1)  USE_PRI="$PRI_A";;
+            2)  USE_PRI="$PRI_B";;
+            3)  USE_PRI="$PRI_C";;
+            *)  USE_PRI="$PRI_X";;
+        esac
+        grep -P "$regex" "$TSV_FILE" | color_line 
+        let ctr+=1
+    done
+
     
+    ;;
     "ope" | "sta" | "clo" | "can" | "sto" | \
     "open" | "started" | "closed" | "canceled" | "stopped" )
     [ ${#action} -eq 3 ] && action=$(echo "$action" | sed 's/can/canceled/;s/clo/closed/;s/sto/stopped/;s/ope/open/')
