@@ -686,6 +686,7 @@ x
 !
         log_changes "$action" "${input:0:15} ..." "${#input} chars" "$file"
         RESULT=1 
+        # for tsv file
         echo "$text" >> $item.comment.txt
     }
 }
@@ -1460,11 +1461,12 @@ note: PRIORITY must be anywhere from A to Z."
 
         ;;
         "ll2" )
-        # this uses egrep and is very fast compared to show which selects each field
-        # however, no control over order of fields
+        # this is a modification of ll1 and does give the data in requested field order
         fields="$*"
         fields=${fields:-"id status severity type title"}
+        echo "$fields"
         count=$( echo $fields | tr ' ' '\n' | wc -l ) 
+        # create sed string to replace field name with a number so we can sort by number i/o field
         ctr=0
         seds=""
         for f in $fields
@@ -1472,11 +1474,11 @@ note: PRIORITY must be anywhere from A to Z."
             seds+="s/:$f:/:$ctr:/g;"
             let ctr+=1
         done
-        echo "seds:$seds"
+        #echo "seds:$seds"
 
         fields=$( echo "$fields" | sed 's/ /|^/g' )
         fields="^$fields"
-        echo "fields::$fields"
+        #echo "fields::$fields"
         data=$( egrep "$fields" $FILELIST | sed $seds | sort | cut -d':' -f3- )
         ctr=0
         echo "$data" | while read LINE
@@ -1558,6 +1560,37 @@ note: PRIORITY must be anywhere from A to Z."
                 output+="$ii\t$due_date\t${status:0:3}\t${severity:0:3}\t${itype:0:3} $title\n"
             done
             echo -e "$output" | sort -k2
+            ;;
+            "tsvupc" )
+            # now check field 7, convert to unix epoch and compare to now, if greater.
+            # if less then break out, no more printing
+            now=`date '+%Y-%m-%d'`
+            tomorrow=`date --date="tomorrow" '+%Y-%m-%d'`
+            cat "$TSV_FILE" | sort -t$'\t' -k7 -r | while read LINE
+            do
+                due_date=$( echo "$LINE" | cut -f7 )
+                #currow=$( date --date="2009-11-25 00:00" +%s )
+                currow=$( date --date="$due_date" +%s )
+                today=$( date +%s )
+                if [ $currow -ge $today ];
+                then
+                    if [ $now == ${due_date:0:10} ];
+                    then
+                        LINE=$( echo -e "$PRI_A$LINE$DEFAULT" )
+                        echo -e "$LINE"
+                    else
+                        if [ $tomorrow == ${due_date:0:10} ];
+                        then
+                            LINE=$( echo -e "$PRI_B$LINE$DEFAULT" )
+                            echo -e "$LINE"
+                        else
+                            echo "$LINE"
+                        fi
+                    fi
+                else
+                    break
+                fi
+            done
             ;;
 
 
