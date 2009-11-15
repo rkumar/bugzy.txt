@@ -730,6 +730,7 @@ hash_data(){
     #echo "$data" | while read LINE
     lastfield="dummy"
             firstline=0
+        OLDIFS=$IFS
     IFS=$'\n'
     for LINE in $( echo "$data" )
     do
@@ -760,6 +761,7 @@ hash_data(){
         fi
     
     done
+    IFS=$OLDIFS
 }
 ## print titles of CSV file
 tsvtitles(){
@@ -772,6 +774,13 @@ tsvtitles(){
 color_line(){
     USE_PRI=${USE_PRI:-"$PRI_A"}
     idata=$( sed 's/\(.*\)/'$USE_PRI'\1'${DEFAULT}'/g;' )
+    # the following works and is a longer alternative
+#    idata=""
+#    while read data
+#    do
+#        #idata+=${USE_PRI}" $data "${DEFAULT}"\n"
+#        idata+='\n'$( echo -e ${USE_PRI}"$data"${DEFAULT} )
+#    done
     echo -e  "$idata"
 }
 
@@ -1358,24 +1367,38 @@ note: PRIORITY must be anywhere from A to Z."
             let ctr+=1
         done
         paditem=$( printf "%4s" $item )
-        rowdata=$( grep "^$paditem" "$TSV_FILE" | tr '\t' '\n' )
+        #rowdata=$( grep "^$paditem" "$TSV_FILE" | tr '\t' '\n' )
         rowdata=$( grep "^$paditem" "$TSV_FILE" )
         let ctr=0
         #echo "$rowdata" | while read field
-        IFS='	'
+        OLDIFS=$IFS
+        IFS=$'\t'
         for field in $( echo -e "$rowdata"  )
         do
-            echo "${headers[$ctr]}: $field"
+            #echo "${headers[$ctr]}: $field"
             hash_set "rowdata" "${headers[$ctr]}" "$field"
-
             let ctr+=1
         done
-        xfields="description fix comments log"
+        IFS=$OLDIFS
+        xfields="title id status severity type assigned_to date_created due_date"
+        for xfile in $xfields
+        do
+            xxfile=$( printf "%-13s" "$xfile" )
+            row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
+            echo -en "$row"
+            hash_echo "rowdata" "$xfile"
+        done
+        echo
+        xfields="description fix comment log"
         for xfile in $xfields
         do
             dfile="${item}.${xfile}.txt" 
             [ -f "$dfile" ] && { 
-            echo "$xfile :" ; cat "$dfile" 
+            xxfile=$( printf "%-13s" "$xfile" )
+            row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
+            echo -e "$row"
+            cat "$dfile" 
+            echo
         }
         done
 
