@@ -855,13 +855,17 @@ case $action in
         read due_date
         [ ! -z "$due_date" ] && i_due_date=`convert_due_date "$due_date"`
     }
+    [  -z "$i_due_date" ] && i_due_date=" "
+    i_due_date=$( printf "%-16s" "$i_due_date" )
     prompts=
     [ "$PROMPT_ASSIGNED_TO" == "yes" ] && {
         [ ! -z "$ASSIGNED_TO" ] && prompts=" [default is $ASSIGNED_TO]"
-        echo -n "Enter assigned to $prompts: "
+        echo -n "Enter assigned to (10 chars) $prompts: "
         read assigned_to
         [ ! -z "$assigned_to" ] && ASSIGNED_TO=$assigned_to
     }
+    ASSIGNED_TO=$( printf "%-10s" "$ASSIGNED_TO" )
+    ASSIGNED_TO=${ASSIGNED_TO:0:10}
 
     serialid=`incr_id`
     task="[Task #$serialid]"
@@ -898,7 +902,10 @@ EndUsage
       tabstat=$( echo ${i_status:0:3} | tr "a-z" "A-Z" )
       tabseve=$( echo ${i_severity:0:3} | tr "a-z" "A-Z" )
       tabtype=$( echo ${i_type:0:3} | tr "a-z" "A-Z" )
-      tabfields="$tabstat${del}$tabseve${del}$tabtype${del}$serialid${del}$now${del}$ASSIGNED_TO${del}$i_due_date${del}$todo"
+      tabid=$( printf "%4s" "$serialid" )
+      
+      #tabfields="$tabstat${del}$tabseve${del}$tabtype${del}$serialid${del}$now${del}$ASSIGNED_TO${del}$i_due_date${del}$todo"
+      tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$now${del}$i_due_date${del}$todo"
       echo "$tabfields" >> "$TSV_FILE"
       [ ! -z "$i_desc" ] && echo "$i_desc" > $serialid.description.txt
 
@@ -1170,6 +1177,7 @@ done # while true
     # status  severity        type    id      date_created    assigned_to     due_date        title
     [ $full_regex -gt 0 ] && regex+="${id}\t${date_created}\t${assigned_to}\t${due_date}\t${title}"
     echo "regex:$regex"
+    tsvtitles
     grep -P "$regex" "$TSV_FILE"
     
     ;;
