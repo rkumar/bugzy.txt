@@ -859,6 +859,94 @@ get_next_id(){
     echo "$nextid" > $idfile
     echo $uniqueid
 }
+## Some tsv generic functions
+# takes fieldname, => index of column
+tsv_column_index(){
+    [ $# -ne 1 ] && { echo "===== tsv_column_index ERROR one param required"; }
+    # put in hash or function to make faster
+    local titles=$( tsvtitles | tr '\t' ' ' )
+    echo `get_word_position "$1" "$titles"`
+}
+# given a string space delimited, returns which position that word is.
+# starts with 1, in "aa bb cc dd" aa is 1, bb is 2, cc 3
+# typically to use with cut which has base 1
+get_word_position(){
+    word="$1"
+    string="$2"
+    let ctr=1
+#    echo "word:$word. string:$string."
+    for w in $string
+    do
+#        echo "comp ($w) ($word) ($ctr)"
+        [ "$w" == "$word" ] && { echo $ctr; return; }
+        let ctr+=1
+    done
+    echo -1;
+}
+
+tsv_get_column_value(){
+    item="$1"
+    field="$2"
+    #echo "item:$item,field:$field."
+    paditem=$( printf "%4s" $item )
+    rowdata=$( grep "^$paditem" "$TSV_FILE" )
+    [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; return;}
+    #echo "rowdata:$rowdata"
+    index=`tsv_column_index "$field"`
+    #echo "index:$index"
+    [ $index -lt 0 ] && { echo "ERROR FIELDNAME $2"; return;}
+    echo "$rowdata" | cut -d $'\t' -f $index
+}
+tsv_get_index_value(){
+    item="$1"
+    index="$2"
+    #echo "item:$item,field:$field"
+    paditem=$( printf "%4s" $item )
+    rowdata=$( grep "^$paditem" "$TSV_FILE" )
+    [ -z "$rowdata" ] && { echo "ERROR itemno $1"; return;}
+    #echo "rowdata:$rowdata"
+    echo "$rowdata" | cut -d $'\t' -f $index
+}
+## given an item, returns linenumber
+tsv_lineno(){
+    item="$1"
+    paditem=$( printf "%4s" $item )
+    lineno=$( grep -n "^$paditem" "$TSV_FILE" | cut -d':' -f1  )
+    [ -z "$lineno" ] && { echo -1; return;}
+    echo $lineno
+}
+## updates tsv row with data for given
+# item, columnname, value
+# -1 on errors
+tsv_set_column_value(){
+    item=$1
+    lineno=`tsv_lineno $item`
+    #echo "line:$lineno"
+    columnname=$2
+    newvalue=$3
+#    wc -l "$TSV_FILE"
+    row=$( sed "$lineno!d" "$TSV_FILE" )
+    #echo "row:$row"
+    [ -z "$row" ] && { echo "row blank!"; return; }
+    sed -i.bak "${lineno}d" "$TSV_FILE"
+#    wc -l "$TSV_FILE"
+    position=`tsv_column_index "$columnname"`
+    #echo "position:$position"
+    newrow=$( echo "$row" | tr '\t' '\n' | sed $position"s/.*/$newvalue/" | tr '\n' '\t' )
+    #echo "newrow:$newrow"
+
+ex - "$TSV_FILE"<<!
+${lineno}i
+$newrow
+.
+x
+!
+#echo
+#diff "$TSV_FILE" "$TSV_FILE".bak
+#    wc -l "$TSV_FILE"
+#    echo
+#    grep "$1" "$TSV_FILE"
+}
 
 ## ADD FUNCTIONS ABOVE
 out=
@@ -1131,6 +1219,7 @@ EndUsage
         newline="$reply: $input"
         now=`date "$DATE_FORMAT"`
         sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
+        tsv_set_column_value $item $reply $input
         log_changes $reply $oldvalue $input $file
                    let modified+=1
         #echo "- LOG,$now,$reply,$oldvalue,$newline" >> $file
@@ -1145,6 +1234,7 @@ EndUsage
                 [ $RESULT -gt 0 ] && {
                    text=$(cat $TMP_FILE)
                    sed -i.bak "/^$reply:/s/^.*$/$reply: $text/" $file
+                   tsv_set_column_value $item $reply $text
                    log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
                    show_diffs 
                    let modified+=1
