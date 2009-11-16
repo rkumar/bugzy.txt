@@ -17,7 +17,7 @@ PROGNAME=$(basename "$0")
 TODO_SH=$PROGNAME
 #TODO_DIR="/Users/rahul/work/projects/rbcurse"
 export PROGNAME
-Date="2009-11-06"
+Date="2009-11-16"
 DATE_FORMAT='+%Y-%m-%d %H:%M'
 arg0=$(basename "$0")
 
@@ -365,7 +365,7 @@ log_changes()
     local oldvalue=$2
     local newline=$3
     local file=$4
-    local now=`date '+%Y-%m-%d %H:%M'`
+    local now=`date "$DATE_FORMAT"`
     [ -z "$key" ] && die "key blank"
     [ -z "$oldvalue" ] && die "oldvalue blank"
     [ -z "$newline" ] && die "newline blank"
@@ -498,7 +498,7 @@ change_status()
     var=$( printf "%s" "${action:0:3}" | tr 'a-z' 'A-Z' )
     echo "$item is currently $oldvalue"
         newline="$reply: $input"
-        now=`date '+%Y-%m-%d %H:%M'`
+        now=`date "$DATE_FORMAT"`
         sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
     echo "$item is now $input"
         log_changes $reply "$oldvalue" $input $file
@@ -676,7 +676,7 @@ add_comment(){
                 [ -z "$input" ] || {
                     start=$(sed -n "/^$reply:/=" $file)
                     [ -z "$reply" ] && die "No section for $reply found in $file"
-                    now=`date '+%Y-%m-%d %H:%M'`
+                    now=`date "$DATE_FORMAT"`
                     text="- $now: $input"
 ex - $file<<!
 ${start}a
@@ -788,6 +788,18 @@ color_line(){
 #        idata+='\n'$( echo -e ${USE_PRI}"$data"${DEFAULT} )
 #    done
     echo -e  "$idata"
+}
+
+# returns a serial number based on a file
+# can be used for programs requiring a running id
+# copied from ~/bin/incr_id on 2009-11-16 17:56 
+get_next_id(){
+    local idfile=$ISSUES_DIR/unique_id
+    [ -f "$idfile" ] || echo "0" > "$idfile"
+    uniqueid=`cat $idfile`
+    let nextid=$uniqueid+1
+    echo "$nextid" > $idfile
+    echo $uniqueid
 }
 
 ## ADD FUNCTIONS ABOVE
@@ -945,7 +957,8 @@ case $action in
 
     short_type=$( echo "${i_type:0:1}" | tr 'a-z' 'A-Z' )
 
-    serialid=`incr_id`
+    #serialid=`incr_id`
+    serialid=`get_next_id`
     task="[$short_type #$serialid]"
     todo="$task $atitle"
     tabtitle="[#$serialid] $atitle"
@@ -956,7 +969,7 @@ case $action in
         $EDITOR $editfile
     else
       #  echo "title: $todo" > "$editfile"
-        now=`date '+%Y-%m-%d %H:%M'`
+        now=`date "$DATE_FORMAT"`
     sed -e 's/^    //' <<EndUsage >"$editfile"
     title: $todo
     id: $serialid
@@ -1054,7 +1067,7 @@ EndUsage
         input=`ask` 
         echo "input is $input"
         newline="$reply: $input"
-        now=`date '+%Y-%m-%d %H:%M'`
+        now=`date "$DATE_FORMAT"`
         sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
         log_changes $reply $oldvalue $input $file
                    let modified+=1
