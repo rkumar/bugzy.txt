@@ -124,12 +124,68 @@ cleanup()
     [[ ! -z "$bak" && -f "$bak" ]] && rm "$bak"
     exit 0
 }
-ask()
+oldask()
 {
     select CHOICE in $CHOICES
     do
         echo "$CHOICE"
         return
+    done
+}
+
+
+## presents choices to user
+## allows user to press ENTER and puts default into reply.
+## adds 'q' option to quit and returns "quit"
+## set CHOICES with your choices, space separated
+# pass $1 as prompt
+# pass $2 as default value if user pressed enter
+#CHOICES="bread butter jam cheese"
+#ask "Please select your breakfast" "jam"
+#echo "i got $ASKRESULT."
+ask(){
+    promptstring="$1"
+    defaultval="$2"
+    local mchoices=$( echo "$CHOICES" | tr '\n\t' '  ')
+    while true
+    do
+        ASKRESULT=
+        if [ ! -z "$promptstring" ];
+        then
+            defaultstring=""
+            [ ! -z "$defaultval" ] && defaultstring="[$defaultval]"
+            echo "${promptstring}${defaultstring}: "
+        fi
+        let ctr=1
+        valid=" "
+        OLDIFS="$IFS"
+        for option in $mchoices
+        do
+            valid+=" $ctr "
+            echo "$ctr) $option"
+            let ctr+=1
+        done
+        IFS="$OLDIFS"
+        echo "q) quit"
+        #echo "valid is ($valid)"
+
+        echo -n "? "
+        read ASKRESULT
+        ret=0
+        [ -z "$ASKRESULT" ] && { ASKRESULT="$defaultval"; return; }
+        [ "$ASKRESULT" == "q" ] && { ASKRESULT="quit"; return;}
+        #[ $reply -gt 0 -a $reply -lt $ctr ] && { ret=1; }
+        #echo "check ( $ASKRESULT ) in ($valid)"
+        count=$(echo "$valid" | grep -c " $ASKRESULT ")
+        #echo "count is $count"
+        [ $count -eq 1 ] && { ASKRESULT=$( echo "$mchoices" | cut -d ' ' -f $ASKRESULT ); return;}
+        if [ $ret -gt 0 ];
+        then
+            #echo "$ASKRESULT"
+            break
+        else
+            echo "Invalid response $ASKRESULT"
+        fi
     done
 }
 ## XXX CAN ONLY BE USED GLOBALLY
@@ -380,15 +436,17 @@ get_code()
 {
     RESULT=
     CHOICES=`hash_echo "VALUES" "$1"`
-    echo "select a value for $1"
-    [ ! -z "$2" ] && echo "[default is $2]"
-    defaultval=${2:-"---"}
+    #echo "select a value for $1"
+    ps="select a value for $1"
+    #[ ! -z "$2" ] && echo "[default is $2]"
+    #defaultval=${2:-"---"}
+    defaultval="$2"
     if [ ! -z "${CHOICES}" ] 
     then
-        local input=`ask` 
-        [ -z "$input" ] && input=$defaultval
-        echo "$input"
-        RESULT=$input
+        #local input=`oldask` 
+        ask "$ps" "$defaultval"
+        echo "$ASKRESULT"
+        RESULT=$ASKRESULT
     else
         echo "$defaultval"
         RESULT=$defaultval 
@@ -1043,13 +1101,15 @@ EndUsage
     [[ "$item" = +([0-9]) ]] || die "$errmsg"
     file=$ISSUES_DIR/${item}.txt
     MAINCHOICES=$(grep '^[a-z_0-9]*:' $file | egrep -v '^log:|^date_|^id:' | cut -d':' -f1  )
-    MAINCHOICES="$MAINCHOICES quit"
+    #MAINCHOICES="$MAINCHOICES quit"
     while true
     do
         CHOICES="$MAINCHOICES"
-    echo "Select field to edit"
+    #echo "Select field to edit"
+    ask "Select field to edit"
     #echo $CHOICES
-    reply=`ask` 
+    #reply=`oldask` 
+    reply=$ASKRESULT
     [ "$reply" == "quit" ] && {
       [ $modified -gt 0 ] && {
       mtitle=$(grep -m 1 "^title:" $file | cut -d':' -f2-)
@@ -1057,15 +1117,17 @@ EndUsage
         }
       break
     }
-    #echo "reply is $reply"
+    echo "reply is ($reply)"
     oldvalue=$(grep -m 1 "^$reply:" $file | cut -d':' -f2-)
     oldvalue=${oldvalue## }
     [ -z "$oldvalue" ] || echo "Select new $reply (old was \"$oldvalue\")"
     CHOICES=`hash_echo "VALUES" "$reply"`
     if [ ! -z "${CHOICES}" ] 
     then
-        input=`ask` 
-        echo "input is $input"
+        #input=`oldask` 
+        ask
+        input=$ASKRESULT
+        echo "input is ($input)"
         newline="$reply: $input"
         now=`date "$DATE_FORMAT"`
         sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
