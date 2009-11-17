@@ -246,7 +246,10 @@ IFS="$oldIFS"
 hash_set "VALUES" "status" "open closed started stopped canceled "
 hash_set "VALUES" "severity" "normal critical serious"
 hash_set "VALUES" "type" "bug feature enhancement task"
-edit_tmpfile()
+hash_set "TSVVALUES" "status" "OPE CLO STA STO CAN"
+hash_set "TSVVALUES" "severity" "NOR CRI SER"
+hash_set "TSVVALUES" "type" "BUG FEA ENH TAS"
+Edit_tmpfile()
 {
             mtime=`stat -c %Y $TMP_FILE`
             $EDITOR $TMP_FILE
@@ -322,9 +325,10 @@ list()
     [ -n "$post_filter_command" ] && {
         filter_command="${filter_command:-}${filter_command:+ | }${post_filter_command:-}"
     }
+        #grep -h -m 1 '^title:' $FILELIST \
+        #| cut -c 8-  \
         items=$(
-        grep -h -m 1 '^title:' $FILELIST \
-        | cut -c 8-  \
+        cut -c63- "$TSV_FILE" \
         | eval ${TODOTXT_SORT_COMMAND}                                        \
         | sed '''
                 s/\(.*(A).*\)/'$PRI_A'\1'$DEFAULT'/g;
@@ -343,12 +347,20 @@ list()
     if [ $VERBOSE_FLAG -gt 0 ]; then
         NUMTASKS=$( echo -ne "$filtered_items" | sed -n '$ =' )
         #TOTALTASKS=$( echo -ne "$items" | sed -n '$ =' )
-        TOTALTASKS=$( ls $ISSUES_DIR/*.txt | wc -l )
+        # we can do ls +(0-9).txt but not sure how portable and requires extglob
+        #TOTALTASKS=$( ls $ISSUES_DIR/*.txt | grep "[0-9]\+\.txt" | wc -l )
+        # tsv stuff OLD above
+        TOTALTASKS=$( grep -c . "$TSV_FILE" )
 
+        # footer
 
         echo "--"
-        echo "${NUMTASKS:-0} of ${TOTALTASKS:-0} issues shown from $ISSUES_DIR"
+        #echo "${NUMTASKS:-0} of ${TOTALTASKS:-0} issues shown from $ISSUES_DIR"
+        echo "${NUMTASKS:-0} of ${TOTALTASKS:-0} issues shown from $TSV_FILE"
 
+        cut -f2 "$TSV_FILE" | awk  '{a[$1] ++} END{for (i in a) print i": "a[i]}' | \
+        sed 's/CAN/canceled/;s/CLO/closed/;s/STO/stopped/;s/OPE/open/;s/STA/started/'
+:<<DUMMY
         statuses=$( grep -h -m 1 '^status:' $FILELIST | sort -u | cut -c 9- )
         for ii in $statuses
         do
@@ -356,6 +368,7 @@ list()
             printf "%12s: " "$ii"
             grep -m 1 "^status: $ii" $FILELIST | wc -l
         done
+DUMMY
     fi
 }
 greptitles()
@@ -545,11 +558,7 @@ change_status()
     item=$1
     action=$2
     errmsg="usage: $TODO_SH $action task#"
-    [ -z "$item" ] && die "$errmsg"
-
-    [[ "$item" = +([0-9]) ]] || die "$errmsg"
-    file=$ISSUES_DIR/${item}.txt
-    [ ! -r "$file" ] && die "No such file: $file"
+    common_validation $1 "$errmsg"
     reply="status"; input="$action";
     oldvalue=`get_value_for_id $item $reply`
     [ "$oldvalue" == "$action" ] && die "$item is already $oldvalue"
@@ -558,13 +567,16 @@ change_status()
         newline="$reply: $input"
         now=`date "$DATE_FORMAT"`
         sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
+        # tsv stuff
+        newcode=`conv_old_to_new_code $input`
+        tsv_set_column_value $item $reply $newcode
     echo "$item is now $input"
         log_changes $reply "$oldvalue" $input $file
         mtitle=`get_title $item`
         [ ! -z "$EMAIL_TO" ] && cat "$file" | mail -s "[$var] $mtitle" $EMAIL_TO
         show_diffs 
 }
-## for actoins that require a bug id
+## for actions that require a bug id
 ## sets item, file
 common_validation()
 {
@@ -777,11 +789,15 @@ get_field_index(){
         *) echo 0
     esac
 }
+## reads data passed as args into field_array
+# I could have done this
+# read -r -a sender <<< "$value"
 array_data(){
     data="$*"
     declare -a field_array
-    export field_array
-    echo "$data" | while read LINE
+    #echo "$data" | while read LINE
+    # while read opens a subshell, so values are lost in parent shell
+    for LINE in $( echo "$data" )
     do
         #field=$( get_value_from_line "$data" )
         field=$( expr "$LINE" : '^\(.*\):' )
@@ -919,6 +935,8 @@ tsv_lineno(){
     [ -z "$lineno" ] && { echo -1; return;}
     echo $lineno
 }
+## deletes row from tsv file ONLY
+## Does not delete other files since update uses this.
 tsv_delete_item(){
     item=$1
     RESULT=0
@@ -930,7 +948,12 @@ tsv_delete_item(){
     [ ! -d "$DELETED_DIR" ] && mkdir "$DELETED_DIR";
     echo "$row" >> "$TSV_FILE_DELETED"
     sed -i.bak "${lineno}d" "$TSV_FILE"
+}
     
+tsv_delete_other_files(){
+    item=$1
+    RESULT=0
+
     # move up the files containing multiline data
     xfields="description fix comment log"
     for xfile in $xfields
@@ -1038,7 +1061,10 @@ export PRI_A=$YELLOW        # color for A priority
 export PRI_B=$GREEN         # color for B priority
 export PRI_C=$CYAN    # color for C priority
 export PRI_X=$WHITE         # color for rest of them
-TODOTXT_SORT_COMMAND=${TODOTXT_SORT_COMMAND:-env LC_COLLATE=C sort -f -k3}
+# OLD flat file
+#TODOTXT_SORT_COMMAND=${TODOTXT_SORT_COMMAND:-env LC_COLLATE=C sort -f -k3}
+# for tsv
+TODOTXT_SORT_COMMAND=${TODOTXT_SORT_COMMAND:-env LC_COLLATE=C sort -f -k2}
 REG_ID="^...."
 REG_STATUS="..."
 REG_SEVERITY="..."
@@ -1078,7 +1104,7 @@ cd $ISSUES_DIR
     [ $VERBOSE_FLAG -gt 1 ] && echo "filelist:$FILELIST"
 }
 
-FILELIST=${FILELIST:-*.txt}
+FILELIST=${FILELIST:-$( ls *.txt | grep "[0-9]\+\.txt") }
 #[ $# -eq 0 ] && {
 #exit 0;
 #}
@@ -1197,10 +1223,8 @@ EndUsage
 "del" | "rm")
     errmsg="usage: $TODO_SH $action task#"
     item=$1
-    [ -z "$item" ] && die "$errmsg"
+    common_validation $1 $errmsg
 
-    [[ "$item" = +([0-9]) ]] || die "$errmsg"
-    file=$ISSUES_DIR/${item}.txt
     # TODO only confirm if not forced
     grep -m 1 "^title" $file
     mtitle=`get_title $item`  # OLD
@@ -1211,6 +1235,7 @@ EndUsage
     mv $file.del "$DELETED_DIR/"
     # tsv stuff
     tsv_delete_item $item
+    tsv_delete_other_files $item
     [ ! -z "$EMAIL_TO" ] && echo -e "$body" | mail -s "[DEL] $mtitle" $EMAIL_TO
     
 
@@ -1221,7 +1246,7 @@ EndUsage
     [ -z "$item" ] && die "$errmsg"
 
     [[ "$item" = +([0-9]) ]] || die "$errmsg"
-    file=$ISSUES_DIR/${item}.txt
+    common_validation $item "$errmsg"
     $EDITOR $file
 
        cleanup;;
@@ -1229,11 +1254,9 @@ EndUsage
     errmsg="usage: $TODO_SH $action task#"
     modified=0
     item=$1
+    common_validation $1 $errmsg
     #severity_values="critical serious normal"
     #type_values="bug feature enhancement task"
-    [ -z "$item" ] && die "$errmsg"
-    [[ "$item" = +([0-9]) ]] || die "$errmsg"
-    file=$ISSUES_DIR/${item}.txt
     MAINCHOICES=$(grep '^[a-z_0-9]*:' $file | egrep -v '^log:|^date_|^id:' | cut -d':' -f1  )
     #MAINCHOICES="$MAINCHOICES quit"
     while true
@@ -1296,6 +1319,18 @@ EndUsage
                 }
 
                 ;;
+            "due_date" )
+            read due_date
+            [ ! -z "$due_date" ] && { due_date=`convert_due_date "$due_date"`
+            text="$due_date"
+                   sed -i.bak "/^$reply:/s/^.*$/$reply: $text/" $file
+                   tsv_set_column_value $item "due_date" "$text"
+
+                   log_changes $reply "${oldvalue}" "${text}" "$file"
+                   show_diffs 
+                   let modified+=1
+                }
+            ;;
             "description" | "fix" )
                 description=`extract_header $reply $file`
                 oldvalue=$description
@@ -1752,7 +1787,7 @@ note: PRIORITY must be anywhere from A to Z."
             for ii in $tasks
             do
                 data=$( cat $ii )
-#                array_data "$data"
+#                array_data "$data" # this did not work since it was in a subshell
 #                itype=${field_array[ $( get_field_index "type" ) ]}
 #                severity=${field_array[ $( get_field_index "severity" ) ]}
 #                status=${field_array[ $( get_field_index "status" ) ]}
