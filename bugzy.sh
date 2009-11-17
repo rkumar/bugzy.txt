@@ -575,9 +575,13 @@ common_validation()
 
     #[ "$#" -ne $argct ] && die "$errmsg"
     [[ "$item" = +([0-9]) ]] || die "$errmsg"
+    # OLD FILE STUFF
     file=$ISSUES_DIR/${item}.txt
     [ ! -r "$file" ] && die "No such file: $file"
 
+    # tsv stuff
+    lineno=`tsv_lineno $item`
+    [ $lineno -lt 1 ] && die "No such item: $item"
 #    [ $VERBOSE_FLAG -gt 0 ] && grep "^title:" $file
 }
 show_diffs()
@@ -915,6 +919,29 @@ tsv_lineno(){
     [ -z "$lineno" ] && { echo -1; return;}
     echo $lineno
 }
+tsv_delete_item(){
+    item=$1
+    RESULT=0
+    lineno=`tsv_lineno $item`
+    [ $lineno -lt 1 ] && { echo "No such item:$item"; RESULT=-1; return;}
+    row=$( sed "$lineno!d" "$TSV_FILE" )
+    #echo "row:$row"
+    [ -z "$row" ] && { echo "row blank!"; return; }
+    [ ! -d "$DELETED_DIR" ] && mkdir "$DELETED_DIR";
+    echo "$row" >> "$TSV_FILE_DELETED"
+    sed -i.bak "${lineno}d" "$TSV_FILE"
+    
+    # move up the files containing multiline data
+    xfields="description fix comment log"
+    for xfile in $xfields
+    do
+        dfile="${item}.${xfile}.txt" 
+        [ -f "$dfile" ] && { 
+        mv "$dfile" "$DELETED_DIR"
+    }
+    done
+    [ $VERBOSE_FLAG -gt 1 ] && ls -ltrh "$DELETED_DIR"
+}
 ## updates tsv row with data for given
 # item, columnname, value
 # -1 on errors
@@ -928,7 +955,8 @@ tsv_set_column_value(){
     row=$( sed "$lineno!d" "$TSV_FILE" )
     #echo "row:$row"
     [ -z "$row" ] && { echo "row blank!"; return; }
-    sed -i.bak "${lineno}d" "$TSV_FILE"
+    #sed -i.bak "${lineno}d" "$TSV_FILE"
+    tsv_delete_item $item
 #    wc -l "$TSV_FILE"
     position=`tsv_column_index "$columnname"`
     #echo "position:$position"
@@ -946,6 +974,13 @@ x
 #    wc -l "$TSV_FILE"
 #    echo
 #    grep "$1" "$TSV_FILE"
+}
+
+## fix for convert old code to new
+## first 3 chars, then capitalize
+conv_old_to_new_code(){
+    old="$1"
+    echo ${old:0:3} | tr 'a-z' 'A-Z'
 }
 
 ## ADD FUNCTIONS ABOVE
@@ -1022,6 +1057,8 @@ ACTION=${1:-$PROG_DEFAULT_ACTION}
 [ -z "$ACTION" ]    && usage
 # added RK 2009-11-06 11:00 to save issues (see edit)
 ISSUES_DIR=$TODO_DIR/.todos
+DELETED_DIR="$ISSUES_DIR/deleted"
+TSV_FILE_DELETED="$DELETED_DIR/deleted.tsv"
 
 if [ $TODOTXT_PLAIN = 1 ]; then
     PRI_A=$NONE
@@ -1166,7 +1203,16 @@ EndUsage
     file=$ISSUES_DIR/${item}.txt
     # TODO only confirm if not forced
     grep -m 1 "^title" $file
-    mv $file $file.bak
+    mtitle=`get_title`  # OLD
+    body=$(cat $file)  # OLD
+    [ ! -d "$DELETED_DIR" ] && mkdir "$DELETED_DIR";
+    #mv $file "$DELETED_DIR/`basename $file`.del" || mv $file $file.del
+    mv $file $file.del
+    mv $file.del "$DELETED_DIR/"
+    # tsv stuff
+    tsv_delete_item $item
+    [ ! -z "$EMAIL_TO" ] && echo -e "$body" | mail -s "[DEL] $mtitle" $EMAIL_TO
+    
 
        cleanup;;
 "edit" | "ed")
@@ -1183,8 +1229,8 @@ EndUsage
     errmsg="usage: $TODO_SH $action task#"
     modified=0
     item=$1
-    severity_values="critical serious normal"
-    type_values="bug feature enhancement task"
+    #severity_values="critical serious normal"
+    #type_values="bug feature enhancement task"
     [ -z "$item" ] && die "$errmsg"
     [[ "$item" = +([0-9]) ]] || die "$errmsg"
     file=$ISSUES_DIR/${item}.txt
@@ -1219,7 +1265,8 @@ EndUsage
         newline="$reply: $input"
         now=`date "$DATE_FORMAT"`
         sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
-        tsv_set_column_value $item $reply $input
+        newcode=`conv_old_to_new_code $input`
+        tsv_set_column_value $item $reply $newcode
         log_changes $reply $oldvalue $input $file
                    let modified+=1
         #echo "- LOG,$now,$reply,$oldvalue,$newline" >> $file
@@ -1668,9 +1715,9 @@ note: PRIORITY must be anywhere from A to Z."
 
         ;;
         "comment" | "addcomment" )
-        cp $file $file.bak
         errmsg="usage: $TODO_SH $action ITEM#"
         common_validation $1 $errmsg 
+        cp $file $file.bak
         reply="comment"
 
         add_comment
