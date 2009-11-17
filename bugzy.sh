@@ -1203,8 +1203,8 @@ EndUsage
     file=$ISSUES_DIR/${item}.txt
     # TODO only confirm if not forced
     grep -m 1 "^title" $file
-    mtitle=`get_title`  # OLD
-    body=$(cat $file)  # OLD
+    mtitle=`get_title $item`  # OLD
+    body=$( cat $file )  # OLD
     [ ! -d "$DELETED_DIR" ] && mkdir "$DELETED_DIR";
     #mv $file "$DELETED_DIR/`basename $file`.del" || mv $file $file.del
     mv $file $file.del
