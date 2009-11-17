@@ -23,6 +23,9 @@ arg0=$(basename "$0")
 
 TSV_FILE="data.tsv"
 #TSV_TITLES_FILE="titles.tsv"
+# what fields are we to prompt for in mod
+EDITFIELDS="title description status severity type assigned_to due_date comment fix"
+PRINTFIELDS="title id status severity type assigned_to date_created due_date"
 
 #ext=${1:-"default value"}
 #today=$(date +"%Y-%m-%d-%H%M")
@@ -328,7 +331,7 @@ list()
         #grep -h -m 1 '^title:' $FILELIST \
         #| cut -c 8-  \
         items=$(
-        cut -c63- "$TSV_FILE" \
+        tsv_titles \
         | eval ${TODOTXT_SORT_COMMAND}                                        \
         | sed '''
                 s/\(.*(A).*\)/'$PRI_A'\1'$DEFAULT'/g;
@@ -526,12 +529,18 @@ process_quadoptions()
         ;;
     esac
 }
-## returns title for a task id
+## returns title for a task id OLD FILE
 get_title()
 {
     item=${1:-$item}
     local file=$ISSUES_DIR/$item.txt
     local mtitle=$(grep -m 1 "^title:" $file | cut -d':' -f2-)
+    echo "$mtitle"
+}
+tsv_get_title()
+{
+    item=${1:-$item}
+    local mtitle=`tsv_get_rowdata $item | cut -c63- `
     echo "$mtitle"
 }
 ## returns value for id and key
@@ -847,8 +856,12 @@ hash_data(){
     done
     IFS=$OLDIFS
 }
+## returns title column, all rows
+tsv_titles(){
+        cut -c63- "$TSV_FILE" 
+}
 ## print titles of CSV file
-tsvtitles(){
+tsv_headers(){
     #sed '1q' "$TSV_FILE"
     echo "id	status	severity	type	assigned_to	date_created	due_date	title"
     #cat "$TSV_TITLES_FILE"
@@ -884,7 +897,7 @@ get_next_id(){
 tsv_column_index(){
     [ $# -ne 1 ] && { echo "===== tsv_column_index ERROR one param required"; }
     # put in hash or function to make faster
-    local titles=$( tsvtitles | tr '\t' ' ' )
+    local titles=$( tsv_headers | tr '\t' ' ' )
     echo `get_word_position "$1" "$titles"`
 }
 # given a string space delimited, returns which position that word is.
@@ -902,6 +915,15 @@ get_word_position(){
         let ctr+=1
     done
     echo -1;
+}
+## returns row for an item
+# please validate item at top of program.
+tsv_get_rowdata(){
+    item="$1"
+    paditem=$( printf "%4s" $item )
+    rowdata=$( grep "^$paditem" "$TSV_FILE" )
+    [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; return -1;}
+    echo "$rowdata"
 }
 
 tsv_get_column_value(){
@@ -1004,6 +1026,38 @@ x
 conv_old_to_new_code(){
     old="$1"
     echo ${old:0:3} | tr 'a-z' 'A-Z'
+}
+
+print_item(){
+    item=$1
+    rowdata=`tsv_get_rowdata $item`
+    output=""
+    for field in $( echo $PRINTFIELDS )
+    do
+        index=`tsv_column_index "$field"`
+        value=$( echo "$rowdata" | cut -d $'\t' -f $index )
+        xxfile=$( printf "%-13s" "$field" )
+        row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
+        output+=$( echo -en "\n$row" )
+        output+=$( echo "$value" )
+    done
+        # read up the files containing multiline data
+        xfields="description fix comment log"
+        for xfile in $xfields
+        do
+            dfile="${item}.${xfile}.txt" 
+            [ -f "$dfile" ] && { 
+            xxfile=$( printf "%-13s" "$xfile" )
+            row=$( echo -e $PRI_A"$xxfile: \n"$DEFAULT )
+            output+=$( echo -e "\n$row\n" )
+            output+="\n"
+            output+=$( cat "$dfile"  )
+            output+="\n"
+        }
+        done
+    echo -e "$output"
+    #echo "index:$index"
+    #paste  <(echo $PRINTFIELDS | tr ' ' '\n') <(echo "$rowdata" | tr '\t' '\n')
 }
 
 ## ADD FUNCTIONS ABOVE
@@ -1116,6 +1170,9 @@ action=$( printf "%s\n" "$ACTION" | tr 'A-Z' 'a-z' )
 shift
 
 case $action in
+    "print" )
+    print_item $1
+    ;;
 "add" | "a")
     if [[ -z "$1" ]]; then
         echo -n "Enter a short title/subject: "
@@ -1257,7 +1314,8 @@ EndUsage
     common_validation $1 $errmsg
     #severity_values="critical serious normal"
     #type_values="bug feature enhancement task"
-    MAINCHOICES=$(grep '^[a-z_0-9]*:' $file | egrep -v '^log:|^date_|^id:' | cut -d':' -f1  )
+    #MAINCHOICES=$(grep '^[a-z_0-9]*:' $file | egrep -v '^log:|^date_|^id:' | cut -d':' -f1  )
+    MAINCHOICES="$EDITFIELDS"
     #MAINCHOICES="$MAINCHOICES quit"
     while true
     do
@@ -1269,8 +1327,10 @@ EndUsage
     reply=$ASKRESULT
     [ "$reply" == "quit" ] && {
       [ $modified -gt 0 ] && {
-      mtitle=$(grep -m 1 "^title:" $file | cut -d':' -f2-)
-        [ ! -z "$EMAIL_TO" ] && cat "$file" | mail -s "[MOD] $mtitle" $EMAIL_TO
+      #mtitle=$(grep -m 1 "^title:" $file | cut -d':' -f2-)
+      mtitle=`tsv_get_title $item`
+      body=`PRI_A=$NONE;DEFAULT=$NONE;print_item $item`
+        [ ! -z "$EMAIL_TO" ] && echo -e "$body" | mail -s "[MOD] $mtitle" $EMAIL_TO
         }
       break
     }
@@ -1421,7 +1481,7 @@ done # while true
     count=$(echo $valid | grep -c $status)
     [ $count -eq 1 ] || die "$errmsg"
     #tasks=$(grep -l -m 1 $FLAG "^status: *$status" $FILELIST)
-    tsvtitles
+    tsv_headers
     grep -P $FLAG "^....\t$status\t" "$TSV_FILE"
     ;;
 "select" | "sel")
@@ -1504,7 +1564,7 @@ done # while true
     #id  status  severity        type    assigned_to     date_created    due_date        title
     [ $full_regex -gt 0 ] && regex+="${assigned_to}\t${date_created}\t${due_date}\t${title}"
     echo "regex:$regex"
-    tsvtitles
+    tsv_headers
     grep -P "$regex" "$TSV_FILE"
     
     ;;
@@ -1529,7 +1589,7 @@ done # while true
     [ -z "$FILELIST" ] || print_tasks
     ;;
 "tsvlbs")
-    tsvtitles
+    tsv_headers
     words="CRI SER NOR"
     ctr=1
     for ii in $words
@@ -1615,15 +1675,15 @@ note: PRIORITY must be anywhere from A to Z."
         # read up the headers into an array
         declare -a headers
         let ctr=0
-        titles=$( tsvtitles | tr '\t' ' ' )
+        titles=$( tsv_headers | tr '\t' ' ' )
         for LINE in $titles
         do
             headers[$ctr]=$LINE
             let ctr+=1
         done
-        paditem=$( printf "%4s" $item )
+        #paditem=$( printf "%4s" $item )
         #rowdata=$( grep "^$paditem" "$TSV_FILE" | tr '\t' '\n' )
-        rowdata=$( grep "^$paditem" "$TSV_FILE" )
+        rowdata=$( tsv_get_rowdata $item )
         #echo "$rowdata" | while read field
 
         # put fields into hash so we can change the order
