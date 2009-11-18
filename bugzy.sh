@@ -178,9 +178,9 @@ ask(){
         [ -z "$ASKRESULT" ] && { ASKRESULT="$defaultval"; return; }
         [ "$ASKRESULT" == "q" ] && { ASKRESULT="quit"; return;}
         #[ $reply -gt 0 -a $reply -lt $ctr ] && { ret=1; }
-        echo "check ( $ASKRESULT ) in ($valid)"
+        #echo "check ( $ASKRESULT ) in ($valid)"
         count=$(echo "$valid" | grep -c " $ASKRESULT ")
-        echo "count is $count"
+        #echo "count is $count"
         [ $count -eq 1 ] && { ASKRESULT=$( echo "$mchoices" | cut -d ' ' -f $ASKRESULT ); return;}
         if [ $ret -gt 0 ];
         then
@@ -252,7 +252,7 @@ hash_set "VALUES" "type" "bug feature enhancement task"
 hash_set "TSVVALUES" "status" "OPE CLO STA STO CAN"
 hash_set "TSVVALUES" "severity" "NOR CRI SER"
 hash_set "TSVVALUES" "type" "BUG FEA ENH TAS"
-Edit_tmpfile()
+edit_tmpfile()
 {
             mtime=`stat -c %Y $TMP_FILE`
             $EDITOR $TMP_FILE
@@ -785,6 +785,7 @@ get_value(){
     #RESULT=$( grep -m 1 "^$key:" | cut -c ${len}- )
     grep -m 1 "^$key:" | cut -c ${len}-
 }
+# old flat file
 get_value_from_line(){
     cut -d':' -f2-
 }
@@ -826,8 +827,8 @@ hash_data(){
     data="$*"
     #echo "$data" | while read LINE
     lastfield="dummy"
-            firstline=0
-        OLDIFS=$IFS
+    firstline=0
+    OLDIFS=$IFS
     IFS=$'\n'
     for LINE in $( echo "$data" )
     do
@@ -930,6 +931,8 @@ tsv_get_rowdata(){
     echo "$rowdata"
 }
 
+# returns value of column for an item and fieldname
+# bombs when description or fix entered
 tsv_get_column_value(){
     item="$1"
     field="$2"
@@ -1033,7 +1036,6 @@ convert_long_to_short_code(){
 }
 ## convert the 3 digit code to longer
 # use only for display and prompting, not storing
-# hey this only works for status FIXME
 convert_short_to_long_code(){
     codecat=$1
     codeval=$2
@@ -1053,6 +1055,10 @@ convert_short_to_long_code(){
     esac
 }
 
+## print out the item like it is in the file.
+# i have removed coloring of the labels since we may mail the file.
+# however the caller can color the labels.
+# echo -e "`b print 143 | sed 's/^\([^:]*\):/'$YELLOW'\1:'$DEFAULT'/g' `"
 print_item(){
     item=$1
     rowdata=`tsv_get_rowdata $item`
@@ -1062,7 +1068,8 @@ print_item(){
         index=`tsv_column_index "$field"`
         value=$( echo "$rowdata" | cut -d $'\t' -f $index )
         xxfile=$( printf "%-13s" "$field" )
-        row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
+        #row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
+        row=$( echo -e "$xxfile: " )
         output+=$( echo -en "\n$row" )
         output+=$( echo "$value" )
     done
@@ -1073,10 +1080,12 @@ print_item(){
             dfile="${item}.${xfile}.txt" 
             [ -f "$dfile" ] && { 
             xxfile=$( printf "%-13s" "$xfile" )
-            row=$( echo -e $PRI_A"$xxfile: \n"$DEFAULT )
+            #row=$( echo -e $PRI_A"$xxfile: \n"$DEFAULT )
+            row=$( echo -e "$xxfile: \n" )
             output+=$( echo -e "\n$row\n" )
             output+="\n"
-            output+=$( cat "$dfile"  )
+            #output+=$( cat "$dfile"  )
+            output+=$( sed 's/^/  /g'  "$dfile"  )
             output+="\n"
         }
         done
@@ -1336,8 +1345,10 @@ EndUsage
 
     # TODO only confirm if not forced
     grep -m 1 "^title" $file
-    mtitle=`get_title $item`  # OLD
-    body=$( cat $file )  # OLD
+    #mtitle=`get_title $item`  # OLD
+    #body=$( cat $file )  # OLD
+    mtitle=`tsv_get_title $item`
+    body=`PRI_A=$NONE;DEFAULT=$NONE;print_item $item`
     [ ! -d "$DELETED_DIR" ] && mkdir "$DELETED_DIR";
     #mv $file "$DELETED_DIR/`basename $file`.del" || mv $file $file.del
     mv $file $file.del
@@ -1390,7 +1401,9 @@ EndUsage
     #oldvalue=$(grep -m 1 "^$reply:" $file | cut -d':' -f2-)
     #oldvalue=${oldvalue## }
     # tsv stuff
+    [ "$reply" != "description" -a "$reply" != "fix" ] && {
     oldvalue=$( tsv_get_column_value $item $reply )
+    }
     [ -z "$oldvalue" ] || echo "Select new $reply (old was \"$oldvalue\")"
     CHOICES=`hash_echo "VALUES" "$reply"`
     if [ ! -z "${CHOICES}" ] 
@@ -1449,7 +1462,9 @@ EndUsage
             ;;
             "description" | "fix" )
             # TODO tsv
-                description=`extract_header $reply $file`
+                #description=`extract_header $reply $file`
+                # tsv stuff
+                description=`cat $item.$reply.txt`
                 oldvalue=$description
                 lines=$(echo "$description"  | wc -l)
                 [ -z "$description" ] && {
