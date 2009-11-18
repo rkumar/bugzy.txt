@@ -1595,7 +1595,7 @@ done # while true
     # XXX
 "tsvselectm" | "tsvselm")
     valid="|status|date_created|severity|type|"
-    errmsg="usage: $TODO_SH $action \"type: bug\" \"status: open\" ..."
+    errmsg="usage: $TODO_SH $action \"type: BUG\" \"status: OPE\" ..."
     [ -z "$1" ] && die "$errmsg"
     #[ -z "$key" ] && die "$errmsg"
     #[ -z "$value" ] && die "$errmsg"
@@ -1642,19 +1642,19 @@ done # while true
     ;;
 "lbs")
     OLDLIST=$FILELIST
-    tasks=$(grep -l -m 1 "^severity: critical" $FILELIST)
+    tasks=$(grep -l -m 1 "^severity: CRI" $FILELIST)
     #echo "tasks $tasks"
     USEPRI=$PRI_A
     FILELIST=$tasks
     [ -z "$FILELIST" ] || print_tasks
     FILELIST=$OLDLIST
-    tasks=$(grep -l -m 1 "^severity: serious" $FILELIST)
+    tasks=$(grep -l -m 1 "^severity: SER" $FILELIST)
     #echo "tasks[$tasks]"
     USEPRI=$PRI_B
     FILELIST=$tasks
     [ -z "$FILELIST" ] || print_tasks
     FILELIST=$OLDLIST
-    tasks=$(grep -l -m 1 "^severity: normal" $FILELIST)
+    tasks=$(grep -l -m 1 "^severity: NOR" $FILELIST)
     #echo "tasks:$tasks:"
     USEPRI=
     FILELIST=$tasks
