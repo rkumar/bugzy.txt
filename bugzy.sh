@@ -1704,7 +1704,7 @@ done # while true
     ctr=1
     for ii in $words
     do
-        regex="^${REG_ID}\t${REG_TYPE}\t$ii"
+        regex="${REG_ID}\t${REG_TYPE}\t$ii"
         case $ctr in
             1)  USE_PRI="$PRI_A";;
             2)  USE_PRI="$PRI_B";;
@@ -2017,6 +2017,20 @@ note: PRIORITY must be anywhere from A to Z."
                     break
                 fi
             done
+            ;;
+            "archive" | "ar" )
+            # TODO move other files also into archive
+            ARCHIVE_FILE="archive.txt"
+            regex="${REG_ID}${DELIM}CLO"
+            count=$( grep -c -P "$regex" "$TSV_FILE" )
+            if [[ $count > 0 ]]; 
+            then  
+                grep -P "$regex" "$TSV_FILE" >> "$ARCHIVE_FILE"
+                sed -i.bak "/$regex/d" "$TSV_FILE"
+                echo "$count row/s archived to $ARCHIVE_FILE";
+            else 
+                echo "nothing to archive";
+            fi
             ;;
 
 
