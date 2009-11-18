@@ -178,9 +178,9 @@ ask(){
         [ -z "$ASKRESULT" ] && { ASKRESULT="$defaultval"; return; }
         [ "$ASKRESULT" == "q" ] && { ASKRESULT="quit"; return;}
         #[ $reply -gt 0 -a $reply -lt $ctr ] && { ret=1; }
-        #echo "check ( $ASKRESULT ) in ($valid)"
+        echo "check ( $ASKRESULT ) in ($valid)"
         count=$(echo "$valid" | grep -c " $ASKRESULT ")
-        #echo "count is $count"
+        echo "count is $count"
         [ $count -eq 1 ] && { ASKRESULT=$( echo "$mchoices" | cut -d ' ' -f $ASKRESULT ); return;}
         if [ $ret -gt 0 ];
         then
@@ -467,6 +467,7 @@ get_code()
         echo "$defaultval"
         RESULT=$defaultval 
     fi
+    RESULT=`convert_long_to_short_code $RESULT`
 }
 
 ## get input from user, if user hits enter use default value
@@ -544,6 +545,7 @@ tsv_get_title()
     echo "$mtitle"
 }
 ## returns value for id and key
+## use tsv_get_column_value() instead
 get_value_for_id()
 {
     local file=$ISSUES_DIR/$1.txt
@@ -569,7 +571,9 @@ change_status()
     errmsg="usage: $TODO_SH $action task#"
     common_validation $1 "$errmsg"
     reply="status"; input="$action";
-    oldvalue=`get_value_for_id $item $reply`
+    # TODO tsv
+    oldvalue=`tsv_get_column_value $item $reply`
+    #oldvalue=`get_value_for_id $item $reply`
     [ "$oldvalue" == "$action" ] && die "$item is already $oldvalue"
     var=$( printf "%s" "${action:0:3}" | tr 'a-z' 'A-Z' )
     echo "$item is currently $oldvalue"
@@ -577,7 +581,7 @@ change_status()
         now=`date "$DATE_FORMAT"`
         sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
         # tsv stuff
-        newcode=`conv_old_to_new_code $input`
+        newcode=`convert_long_to_short_code $input`
         tsv_set_column_value $item $reply $newcode
     echo "$item is now $input"
         log_changes $reply "$oldvalue" $input $file
@@ -1023,9 +1027,30 @@ x
 
 ## fix for convert old code to new
 ## first 3 chars, then capitalize
-conv_old_to_new_code(){
+convert_long_to_short_code(){
     old="$1"
     echo ${old:0:3} | tr 'a-z' 'A-Z'
+}
+## convert the 3 digit code to longer
+# use only for display and prompting, not storing
+# hey this only works for status FIXME
+convert_short_to_long_code(){
+    codecat=$1
+    codeval=$2
+    case $codecat in
+        "status" )
+        echo "$codeval" | sed 's/CAN/canceled/;s/CLO/closed/;s/STO/stopped/;s/OPE/open/;s/STA/started/'
+        ;;
+        "severity" )
+        echo "$codeval" | sed 's/NOR/normal/;s/SER/serious/;s/CRI/critical/'
+        ;;
+        "type" )
+        echo "$codeval" | sed 's/BUG/bug/;s/ENH/enhancement/;s/FEA/feature/'
+        ;;
+        * )
+        echo "---"
+        ;;
+    esac
 }
 
 print_item(){
@@ -1236,15 +1261,18 @@ case $action in
     else
       #  echo "title: $todo" > "$editfile"
         now=`date "$DATE_FORMAT"`
+      tabstat=$( echo ${i_status:0:3} | tr "a-z" "A-Z" )
+      tabseve=$( echo ${i_severity:0:3} | tr "a-z" "A-Z" )
+      tabtype=$( echo ${i_type:0:3} | tr "a-z" "A-Z" )
     sed -e 's/^    //' <<EndUsage >"$editfile"
     title: $todo
     id: $serialid
     description:
     $i_desc
     date_created: $now
-    status: $i_status
-    severity: $i_severity
-    type: $i_type
+    status: $tabstat
+    severity: $tabseve
+    type: $tabtype
     assigned_to: $ASSIGNED_TO
     due_date: $i_due_date
     comment: 
@@ -1335,8 +1363,10 @@ EndUsage
       break
     }
     echo "reply is ($reply)"
-    oldvalue=$(grep -m 1 "^$reply:" $file | cut -d':' -f2-)
-    oldvalue=${oldvalue## }
+    #oldvalue=$(grep -m 1 "^$reply:" $file | cut -d':' -f2-)
+    #oldvalue=${oldvalue## }
+    # tsv stuff
+    oldvalue=$( tsv_get_column_value $item $reply )
     [ -z "$oldvalue" ] || echo "Select new $reply (old was \"$oldvalue\")"
     CHOICES=`hash_echo "VALUES" "$reply"`
     if [ ! -z "${CHOICES}" ] 
@@ -1344,13 +1374,15 @@ EndUsage
         #input=`oldask` 
         ask
         input=$ASKRESULT
-        echo "input is ($input)"
-        newline="$reply: $input"
+        [ "$input" == "quit" ] && continue;
+        longcode=`convert_short_to_long_code $reply $input`
+        newcode=`convert_long_to_short_code $input` # not required now since its new code
+        echo "input is $longcode ($input)"
+        newline="$reply: $newcode" # for FLAT file
         now=`date "$DATE_FORMAT"`
         sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
-        newcode=`conv_old_to_new_code $input`
         tsv_set_column_value $item $reply $newcode
-        log_changes $reply $oldvalue $input $file
+        log_changes $reply $oldvalue $newcode $file
                    let modified+=1
         #echo "- LOG,$now,$reply,$oldvalue,$newline" >> $file
         echo "done ..."
@@ -1392,6 +1424,7 @@ EndUsage
                 }
             ;;
             "description" | "fix" )
+            # TODO tsv
                 description=`extract_header $reply $file`
                 oldvalue=$description
                 lines=$(echo "$description"  | wc -l)
