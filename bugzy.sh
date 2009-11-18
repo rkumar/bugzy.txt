@@ -1023,22 +1023,16 @@ tsv_set_column_value(){
     #lineno=`tsv_lineno $item`
     #echo "line:$lineno"
     columnname=$2
-    newvalue=$3
-#    wc -l "$TSV_FILE"
-    #row=$( sed "$lineno!d" "$TSV_FILE" )
+    newvalue="$3"
     row=$( tsv_get_rowdata_with_lineno $item )
     #echo "row:$row"
     [ -z "$row" ] && { echo "row blank!"; return; }
-    #sed -i.bak "${lineno}d" "$TSV_FILE"
-    #tsv_delete_item $item
-    # FIXME TODO deleting a row and inserting can be a problem, what if insert fails
-    # also ex unable to insert if last row deleted
-#    wc -l "$TSV_FILE"
     position=`tsv_column_index "$columnname"`
     #echo "position:$position"
     newrow=$( echo "$row" | tr '\t' '\n' | sed $position"s/.*/$newvalue/" | tr '\n' '\t' )
-    newrow=$( echo "$row" | sed "s/$DELIM$//" )
-    # XXX TODO FIXME above puts extra tab at end each time
+    newrow=$( echo "$newrow" | sed "s/$DELIM$//" )
+    # could use $o
+    #var=$(echo ${var%\t})
     #echo "newrow:$newrow"
 
 ex - "$TSV_FILE"<<!
@@ -1047,11 +1041,6 @@ $newrow
 .
 x
 !
-#echo
-#diff "$TSV_FILE" "$TSV_FILE".bak
-#    wc -l "$TSV_FILE"
-#    echo
-#    grep "$1" "$TSV_FILE"
 }
 
 ## fix for convert old code to new
@@ -1145,9 +1134,20 @@ calc_overdue()
 }
 
 pretty_print(){
+    tomorrow=`date --date="tomorrow" '+%Y-%m-%d'`
+    dayafter=`date --date="+2 days" '+%Y-%m-%d'`
     if (( $PRETTY_PRINT > 0 ));
     then
-        sed "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;s/$DELIM/$TSV_OUTPUT_DELIMITER/g"
+        local data=$( sed -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
+            -e  "s/${DELIM}CRI${DELIM}/${DELIM}${PRI_A}CRI${DEFAULT}${DELIM}/g" \
+            -e  "s/${DELIM}SER${DELIM}/${DELIM}${PRI_A}SER${DEFAULT}${DELIM}/g" \
+            -e  "/${DELIM}${tomorrow}${DELIM}/s/.*/${PRI_A}&${DEFAULT}/g" \
+            -e  "/${DELIM}${dayafter}${DELIM}/s/.*/${PRI_B}&${DEFAULT}/g" \
+            -e  "s/${tomorrow}/${PRI_A}${tomorrow}${DEFAULT}/g" \
+            -e  "s/${dayafter}/${PRI_B}${dayafter}${DEFAULT}/g" \
+            -e "s/$DELIM/$TSV_OUTPUT_DELIMITER/g" 
+            )
+            echo -e "$data"
     fi
 }
 
@@ -1210,6 +1210,7 @@ export PRI_X=$WHITE         # color for rest of them
 TODOTXT_SORT_COMMAND=${TODOTXT_SORT_COMMAND:-env LC_COLLATE=C sort -f -k3}
 # for tsv (list cannot use tsv_titles since FILELIST is not used
 #TODOTXT_SORT_COMMAND=${TODOTXT_SORT_COMMAND:-env LC_COLLATE=C sort -f -k2}
+TSV_SORT_COMMAND=${TSV_SORT_COMMAND:-"env LC_COLLATE=C sort -t$'\t' -k7 -r"}
 REG_ID="^...."
 REG_STATUS="..."
 REG_SEVERITY="..."
@@ -1447,7 +1448,7 @@ EndUsage
         [ "$input" == "quit" ] && continue;
         longcode=`convert_short_to_long_code $reply $input`
         newcode=`convert_long_to_short_code $input` # not required now since its new code
-        echo "input is $longcode ($input)"
+        echo "input is $longcode ($newcode)"
         newline="$reply: $newcode" # for FLAT file
         now=`date "$DATE_FORMAT"`
         sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
@@ -1466,7 +1467,7 @@ EndUsage
                 [ $RESULT -gt 0 ] && {
                    text=$(cat $TMP_FILE)
                    sed -i.bak "/^$reply:/s/^.*$/$reply: $text/" $file
-                   tsv_set_column_value $item $reply $text
+                   tsv_set_column_value $item $reply "$text"
                    log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
                    show_diffs 
                    let modified+=1
@@ -1589,7 +1590,9 @@ done # while true
     [ $count -eq 1 ] || die "$errmsg"
     #tasks=$(grep -l -m 1 $FLAG "^status: *$status" $FILELIST)
     formatted_tsv_headers 
-    grep -P $FLAG "^....\t$status\t" "$TSV_FILE" | pretty_print
+    grep -P $FLAG "^....\t$status\t" "$TSV_FILE" \
+        | eval ${TSV_SORT_COMMAND}           \
+        | pretty_print
     ;;
 "select" | "sel")
     ## lists titles for a key and value
