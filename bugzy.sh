@@ -26,6 +26,10 @@ TSV_FILE="data.tsv"
 # what fields are we to prompt for in mod
 EDITFIELDS="title description status severity type assigned_to due_date comment fix"
 PRINTFIELDS="title id status severity type assigned_to date_created due_date"
+PRETTY_PRINT=1
+TSV_OUTPUT_DELIMITER=" | "
+# input delimiter or IFS
+DELIM=$'\t'
 
 #ext=${1:-"default value"}
 #today=$(date +"%Y-%m-%d-%H%M")
@@ -328,10 +332,11 @@ list()
     [ -n "$post_filter_command" ] && {
         filter_command="${filter_command:-}${filter_command:+ | }${post_filter_command:-}"
     }
-        #grep -h -m 1 '^title:' $FILELIST \
-        #| cut -c 8-  \
+    # tsv_titles does not use FILELIST XXX
+        #tsv_titles \
         items=$(
-        tsv_titles \
+        grep -h -m 1 '^title:' $FILELIST \
+        | cut -c 8-  \
         | eval ${TODOTXT_SORT_COMMAND}                                        \
         | sed '''
                 s/\(.*(A).*\)/'$PRI_A'\1'$DEFAULT'/g;
@@ -871,6 +876,12 @@ tsv_headers(){
     echo "id	status	severity	type	assigned_to	date_created	due_date	title"
     #cat "$TSV_TITLES_FILE"
 }
+# gives formatter header for printing
+# see pretty_print
+formatted_tsv_headers(){
+    echo "  Id |Statu|Sever|Type |Assigned To |Date Created|  Due Date  |     Title"
+    echo "-----+-----+-----+-----+------------+------------+------------+-----------------------"
+}
 ## color the given data
 ## please set USE_PRI before calling else it will use $PRI_A
 color_line(){
@@ -928,6 +939,15 @@ tsv_get_rowdata(){
     paditem=$( printf "%4s" $item )
     rowdata=$( grep "^$paditem" "$TSV_FILE" )
     [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; return -1;}
+    echo "$rowdata"
+}
+tsv_get_rowdata_with_lineno(){
+    item="$1"
+    paditem=$( printf "%4s" $item )
+    rowdata=$( grep -n "^$paditem" "$TSV_FILE" )
+    [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; return -1;}
+    rowdata=$( cut -d':' -f2- <<< "$rowdata" )
+    lineno=$( cut -d':' -f1 <<< "$rowdata" )
     echo "$rowdata"
 }
 
@@ -997,26 +1017,32 @@ tsv_delete_other_files(){
 ## updates tsv row with data for given
 # item, columnname, value
 # -1 on errors
+# TODO use ex change and not delete and insert.
 tsv_set_column_value(){
     item=$1
-    lineno=`tsv_lineno $item`
+    #lineno=`tsv_lineno $item`
     #echo "line:$lineno"
     columnname=$2
     newvalue=$3
 #    wc -l "$TSV_FILE"
-    row=$( sed "$lineno!d" "$TSV_FILE" )
+    #row=$( sed "$lineno!d" "$TSV_FILE" )
+    row=$( tsv_get_rowdata_with_lineno $item )
     #echo "row:$row"
     [ -z "$row" ] && { echo "row blank!"; return; }
     #sed -i.bak "${lineno}d" "$TSV_FILE"
-    tsv_delete_item $item
+    #tsv_delete_item $item
+    # FIXME TODO deleting a row and inserting can be a problem, what if insert fails
+    # also ex unable to insert if last row deleted
 #    wc -l "$TSV_FILE"
     position=`tsv_column_index "$columnname"`
     #echo "position:$position"
     newrow=$( echo "$row" | tr '\t' '\n' | sed $position"s/.*/$newvalue/" | tr '\n' '\t' )
+    newrow=$( echo "$row" | sed "s/$DELIM$//" )
+    # XXX TODO FIXME above puts extra tab at end each time
     #echo "newrow:$newrow"
 
 ex - "$TSV_FILE"<<!
-${lineno}i
+${lineno}c
 $newrow
 .
 x
@@ -1118,6 +1144,13 @@ calc_overdue()
     #echo "$days days $hours hour(s) "
 }
 
+pretty_print(){
+    if (( $PRETTY_PRINT > 0 ));
+    then
+        sed "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;s/$DELIM/$TSV_OUTPUT_DELIMITER/g"
+    fi
+}
+
 ## ADD FUNCTIONS ABOVE
 out=
 file=
@@ -1174,9 +1207,9 @@ export PRI_B=$GREEN         # color for B priority
 export PRI_C=$CYAN    # color for C priority
 export PRI_X=$WHITE         # color for rest of them
 # OLD flat file
-#TODOTXT_SORT_COMMAND=${TODOTXT_SORT_COMMAND:-env LC_COLLATE=C sort -f -k3}
-# for tsv
-TODOTXT_SORT_COMMAND=${TODOTXT_SORT_COMMAND:-env LC_COLLATE=C sort -f -k2}
+TODOTXT_SORT_COMMAND=${TODOTXT_SORT_COMMAND:-env LC_COLLATE=C sort -f -k3}
+# for tsv (list cannot use tsv_titles since FILELIST is not used
+#TODOTXT_SORT_COMMAND=${TODOTXT_SORT_COMMAND:-env LC_COLLATE=C sort -f -k2}
 REG_ID="^...."
 REG_STATUS="..."
 REG_SEVERITY="..."
@@ -1516,11 +1549,12 @@ done # while true
        cleanup;;
 "liststat" | "lists")
    ## if - is given, e.g. -open, then all but open are shown
-    valid="|open|closed|started|stopped|canceled|"
+    #valid="|open|closed|started|stopped|canceled|"
+    valid="|OPE|CLO|STA|STO|CAN|"
     errmsg="usage: $TODO_SH $action $valid"
     status=$1
     [ -z "$status" ] && die "$errmsg"
-    status=$( printf "%s\n" "$status" | tr 'A-Z' 'a-z' )
+#    status=$( printf "%s\n" "$status" | tr 'A-Z' 'a-z' )
 
     ## all except given status
     FLAG=""
@@ -1528,6 +1562,7 @@ done # while true
        FLAG="-L"
        status=${status:1}
     }
+    status=`convert_long_to_short_code $status`
 
     count=$(echo $valid | grep -c $status)
     [ $count -eq 1 ] || die "$errmsg"
@@ -1553,8 +1588,8 @@ done # while true
     count=$(echo $valid | grep -c $status)
     [ $count -eq 1 ] || die "$errmsg"
     #tasks=$(grep -l -m 1 $FLAG "^status: *$status" $FILELIST)
-    tsv_headers
-    grep -P $FLAG "^....\t$status\t" "$TSV_FILE"
+    formatted_tsv_headers 
+    grep -P $FLAG "^....\t$status\t" "$TSV_FILE" | pretty_print
     ;;
 "select" | "sel")
     ## lists titles for a key and value
