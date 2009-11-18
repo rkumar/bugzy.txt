@@ -1084,6 +1084,30 @@ print_item(){
     #echo "index:$index"
     #paste  <(echo $PRINTFIELDS | tr ' ' '\n') <(echo "$rowdata" | tr '\t' '\n')
 }
+## given a date, calculates how much time from now (upcoming or overdue)
+## If overdue, then says overdue.
+calc_overdue()
+{
+    local due_date="$1"
+    local currow=$( date --date="$due_date" +%s )
+    local today=$( date +%s )
+    let seconds=currow-today
+    text=""
+    if ((seconds < 0)); then abs=-1; text="overdue";  else abs=1; fi
+    seconds=$seconds*$abs
+    days=$((seconds / (3600*24) ))
+    hours=$((seconds / 3600))
+    seconds=$((seconds % 3600))
+    minutes=$((seconds / 60))
+    seconds=$((seconds % 60))
+
+    [ $days -gt 0 ] && {  echo "$days days $text"; return; }
+    [ $hours -gt 0 ] && {  echo "$hours hours $text"; return; }
+    [ $minutes -gt 0 ] && {  echo "$minutes minutes $text"; return; }
+
+    #echo "$days days $hours hour(s) $minutes minute(s) $seconds second(s)"
+    #echo "$days days $hours hour(s) "
+}
 
 ## ADD FUNCTIONS ABOVE
 out=
@@ -1738,6 +1762,7 @@ note: PRIORITY must be anywhere from A to Z."
             row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
             echo -en "$row"
             hash_echo "rowdata" "$xfile"
+            [ "$xfile" == "due_date" ] && { calc_overdue $( hash_echo "rowdata" "$xfile" ); }
         done
         echo
         # read up the files containing multiline data
