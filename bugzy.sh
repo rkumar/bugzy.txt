@@ -1703,6 +1703,10 @@ note: PRIORITY must be anywhere from A to Z."
         [ $VERBOSE_FLAG -gt 1 ] && grep "^title:" $file
         show_info $item
         sed  -i.bak -e "s/^\(title: \[.*\]\) (.)/\1/" -e  "s/^\(title: \[.*\]\)/\1 ($newpri)/" $file
+        # tsv stuff
+        oldvalue=$( tsv_get_column_value $item "title" )
+        newvalue=$( echo "$oldvalue" | sed  -e "s/^\(\[.*\]\) (.)/\1/" -e  "s/^\(\[.*\]\)/\1 ($newpri)/" )
+        tsv_set_column_value $item "title" "$newvalue"
         [ $VERBOSE_FLAG -gt 1 ] && grep "^title:" $file
         show_info $item 'title' 'type' 'status'
         show_diffs 
@@ -1716,6 +1720,10 @@ note: PRIORITY must be anywhere from A to Z."
         common_validation $1 $errmsg 
         get_title
         sed  -i.bak "s/^\(title: \[.*\]\) (.)/\1/" $file
+        # tsv stuff
+        oldvalue=$( tsv_get_column_value $item "title" )
+        newvalue=$( echo "$oldvalue" | sed  -e "s/^\(\[.*\]\) (.)/\1/" )
+        tsv_set_column_value $item "title" "$newvalue"
         get_title
         show_diffs 
         cleanup
