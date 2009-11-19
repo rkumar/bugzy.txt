@@ -22,6 +22,7 @@ DATE_FORMAT='+%Y-%m-%d %H:%M'
 arg0=$(basename "$0")
 
 TSV_FILE="data.tsv"
+EXTRA_DATA_FILE="ext.txt"
 #TSV_TITLES_FILE="titles.tsv"
 # what fields are we to prompt for in mod
 EDITFIELDS="title description status severity type assigned_to due_date comment fix"
@@ -450,6 +451,10 @@ log_changes()
     data="- LOG,$now,$key,$oldvalue,$newline"
     echo "$data" >> $file
     echo "$data" >> $item.log.txt
+    # combined file, log in another file ?
+    echo "$item:log:$data" >> "$EXTRA_DATA_FILE"
+    #i_desc_pref=$( echo "$data" | sed "s/^/$item:log:/g" )
+    #echo "$i_desc_pref" >> "$EXTRA_DATA_FILE"
 
 }
 ## get_code "type"
@@ -582,13 +587,14 @@ change_status()
     [ "$oldvalue" == "$action" ] && die "$item is already $oldvalue"
     var=$( printf "%s" "${action:0:3}" | tr 'a-z' 'A-Z' )
     echo "$item is currently $oldvalue"
-        newline="$reply: $input"
+        newcode=`convert_long_to_short_code $input`
+        newline="$reply: $newcode"
         now=`date "$DATE_FORMAT"`
         sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
         # tsv stuff
         newcode=`convert_long_to_short_code $input`
         tsv_set_column_value $item $reply $newcode
-    echo "$item is now $input"
+        echo "$item is now $input ($newcode)"
         log_changes $reply "$oldvalue" $input $file
         mtitle=`get_title $item`
         [ ! -z "$EMAIL_TO" ] && cat "$file" | mail -s "[$var] $mtitle" $EMAIL_TO
@@ -780,6 +786,8 @@ x
         RESULT=1 
         # for tsv file
         echo "$text" >> $item.comment.txt
+        # okay as long as one line comment
+        echo "$item:com:$text" >> "$EXTRA_DATA_FILE"
     }
 }
 ## returns field value given a field
@@ -997,6 +1005,8 @@ tsv_delete_item(){
     [ ! -d "$DELETED_DIR" ] && mkdir "$DELETED_DIR";
     echo "$row" >> "$TSV_FILE_DELETED"
     sed -i.bak "${lineno}d" "$TSV_FILE"
+    #moved back here on 2009-11-19 12:34 since update does not delete and should not
+    tsv_delete_other_files $item
 }
     
 tsv_delete_other_files(){
@@ -1013,6 +1023,9 @@ tsv_delete_other_files(){
     }
     done
     [ $VERBOSE_FLAG -gt 1 ] && ls -ltrh "$DELETED_DIR"
+    # TODO delete files from here
+    grep "^$item:" "$EXTRA_DATA_FILE" >> deleted.extra.txt
+    sed -i.bak "/^$item:/d" "$EXTRA_DATA_FILE"
 }
 ## updates tsv row with data for given
 # item, columnname, value
@@ -1083,8 +1096,8 @@ print_item(){
         index=`tsv_column_index "$field"`
         value=$( echo "$rowdata" | cut -d $'\t' -f $index )
         xxfile=$( printf "%-13s" "$field" )
-        #row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
-        row=$( echo -e "$xxfile: " )
+        row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
+        #row=$( echo -e "$xxfile: " )
         output+=$( echo -en "\n$row" )
         output+=$( echo "$value" )
     done
@@ -1092,15 +1105,13 @@ print_item(){
         xfields="description fix comment log"
         for xfile in $xfields
         do
-            dfile="${item}.${xfile}.txt" 
-            [ -f "$dfile" ] && { 
+            description=$( get_extra_data $item $xfile )
+            [ ! -z "$description" ] && { 
             xxfile=$( printf "%-13s" "$xfile" )
-            #row=$( echo -e $PRI_A"$xxfile: \n"$DEFAULT )
-            row=$( echo -e "$xxfile: \n" )
+            row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
             output+=$( echo -e "\n$row\n" )
             output+="\n"
-            #output+=$( cat "$dfile"  )
-            output+=$( sed 's/^/  /g'  "$dfile"  )
+            output+=$( echo "$description" | sed 's/^/  /g'  )
             output+="\n"
         }
         done
@@ -1150,6 +1161,29 @@ pretty_print(){
             echo -e "$data"
     fi
 }
+# return fields from extra file (comments, description, fix)
+#  2009-11-19 12:48 
+get_extra_data(){
+    item=$1
+    reply=$2 # field name
+
+    #description=`extract_header $reply $file`
+    # tsv stuff
+    #description=`cat $item.$reply.txt`
+    # combined file approach
+    regex="^$item:${reply:0:3}" 
+    description=$( grep "^$item:${reply:0:3}" "$EXTRA_DATA_FILE"  | cut -d: -f3- )
+    echo "$description"
+}
+update_extra_data(){
+    item=$1
+    reply=$2
+    text="$3"
+    #echo "$item:${reply:0:3}:$text" >> "$EXTRA_DATA_FILE"
+    i_desc_pref=$( echo "$text" | sed "s/^/$item:${reply:0:3}:/g" )
+    sed -i.bak "/^$item:${reply:0:3}:/d" "$EXTRA_DATA_FILE"
+    echo "$i_desc_pref" >> "$EXTRA_DATA_FILE"
+}
 
 ## ADD FUNCTIONS ABOVE
 out=
@@ -1158,23 +1192,23 @@ Dflag=
 while getopts hpvVf:o:D:d:i: flag
 do
     case "$flag" in
-    (h) help; exit 0;;
-    (V) echo "$arg0: version @REVISION@ ($Date) Author: rkumar"; exit 0;;
-    (v) 
+        (h) help; exit 0;;
+        (V) echo "$arg0: version @REVISION@ ($Date) Author: rkumar"; exit 0;;
+        (v) 
         : $(( VERBOSE_FLAG++ ))
         ;;
-    (f) file="$OPTARG";;
-    p )
+        (f) file="$OPTARG";;
+        p )
         TODOTXT_PLAIN=1
         ;;
-    (o) out="$OPTARG";;
-    (D) Dflag="$Dflag $OPTARG";;
-    d )
+        (o) out="$OPTARG";;
+        (D) Dflag="$Dflag $OPTARG";;
+        d )
         PROG_CFG_FILE=$OPTARG
         ;;
-     (i) _FILES="$OPTARG"
-         ;;
-    (*) usage;;
+        (i) _FILES="$OPTARG"
+        ;;
+        (*) usage;;
     esac
 done
 shift $(($OPTIND - 1))
@@ -1361,6 +1395,12 @@ EndUsage
       tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$now${del}$i_due_date${del}$tabtitle"
       echo "$tabfields" >> "$TSV_FILE"
       [ ! -z "$i_desc" ] && echo "$i_desc" > $serialid.description.txt
+      # combined file approach
+      [ ! -z "$i_desc" ] && {
+          i_desc_pref=$( echo "$i_desc" | sed "s/^/$serialid:des:/g" )
+          #echo "$serialid:des:$i_desc" >> "$EXTRA_DATA_FILE"
+          echo "$i_desc_pref" >> "$EXTRA_DATA_FILE"
+      }
 
     process_quadoptions  "$SEND_EMAIL" "Send file by email?"
     #[ $RESULT == "yes" ] && get_input "emailid" "$ASSIGNED_TO"
@@ -1389,7 +1429,6 @@ EndUsage
     mv $file.del "$DELETED_DIR/"
     # tsv stuff
     tsv_delete_item $item
-    tsv_delete_other_files $item
     [ ! -z "$EMAIL_TO" ] && echo -e "$body" | mail -s "[DEL] $mtitle" $EMAIL_TO
     
 
@@ -1496,9 +1535,12 @@ EndUsage
             ;;
             "description" | "fix" )
             # TODO tsv
+                description=$( get_extra_data $item $reply )
                 #description=`extract_header $reply $file`
                 # tsv stuff
-                description=`cat $item.$reply.txt`
+                #description=`cat $item.$reply.txt`
+                # combined file approach
+                #description=$( grep '^$item:${reply:0:3}' "$EXTRA_DATA_FILE"  | cut -d: -f3- )
                 oldvalue=$description
                 lines=$(echo "$description"  | wc -l)
                 [ -z "$description" ] && {
@@ -1528,6 +1570,11 @@ x
     }
     # tsv stuff
     echo "$text" > $item.$reply.txt
+    update_extra_data $item $reply "$text"
+#    i_desc_pref=$( echo "$text" | sed "s/^/$item:${reply:0:3}:/g" )
+#    #echo "$item:${reply:0:3}:$text" >> "$EXTRA_DATA_FILE"
+#    sed -i.bak "/^$item:${reply:0:3}:/d" "$EXTRA_DATA_FILE"
+#    echo "$i_desc_pref" >> "$EXTRA_DATA_FILE"
 
     show_diffs $file $file.bak.1 
     rm $file.bak.1
@@ -1830,13 +1877,21 @@ note: PRIORITY must be anywhere from A to Z."
         xfields="description fix comment log"
         for xfile in $xfields
         do
-            dfile="${item}.${xfile}.txt" 
-            [ -f "$dfile" ] && { 
+            description=$( get_extra_data $item $xfile )
+            [ ! -z "$description" ] && { 
             xxfile=$( printf "%-13s" "$xfile" )
             row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
             echo -e "$row"
-            cat "$dfile" 
+            #echo "$description"
+            echo "$description" | sed 's/^/  /g' 
             echo
+#            dfile="${item}.${xfile}.txt" 
+#            [ -f "$dfile" ] && { 
+#            xxfile=$( printf "%-13s" "$xfile" )
+#            row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
+#            echo -e "$row"
+#            cat "$dfile" 
+#            echo
         }
         done
 
