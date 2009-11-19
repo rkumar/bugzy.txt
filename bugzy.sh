@@ -1259,6 +1259,8 @@ pretty_print(){
         local data=$( sed -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
             -e  "s/${DELIM}CRI${DELIM}/${DELIM}${PRI_A}CRI${DEFAULT}${DELIM}/g" \
             -e  "s/${DELIM}SER${DELIM}/${DELIM}${PRI_A}SER${DEFAULT}${DELIM}/g" \
+            -e  "/^....${DELIM}CLO${DELIM}/s/^ /x/g" \
+            -e  "/^....${DELIM}OPE${DELIM}/s/^ /_/g" \
             -e  "/${DELIM}${tomorrow}${DELIM}/s/\(\[#.*\)/${PRI_A}\1${DEFAULT}/g" \
             -e  "/${DELIM}${dayafter}${DELIM}/s/\(\[#.*\)/${PRI_B}\1${DEFAULT}/g" \
             -e  "s/${tomorrow}/${PRI_A}${tomorrow}${DEFAULT}/g" \
@@ -2209,6 +2211,9 @@ note: PRIORITY must be anywhere from A to Z."
             else 
                 echo "nothing to archive";
             fi
+            ;;
+            "quick" | "q" )
+            cut -c6-8,63- "$TSV_FILE" | sed 's/^OPE/_ /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g' | sort -k1,1
             ;;
 
 
