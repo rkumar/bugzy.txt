@@ -1296,10 +1296,10 @@ action=$( printf "%s\n" "$ACTION" | tr 'A-Z' 'a-z' )
 shift
 
 case $action in
-    "print" )
+    "print" ) # COMMAND
     print_item $1
     ;;
-"add" | "a")
+"add" | "a") # COMMAND
     if [[ -z "$1" ]]; then
         echo -n "Enter a short title/subject: "
         read atitle
@@ -1412,7 +1412,7 @@ EndUsage
     echo "Created $serialid"
 
        cleanup;;
-"del" | "rm")
+"del" | "rm") # COMMAND
     errmsg="usage: $TODO_SH $action task#"
     item=$1
     common_validation $1 $errmsg
@@ -1433,7 +1433,7 @@ EndUsage
     
 
        cleanup;;
-"edit" | "ed")
+"edit" | "ed") # COMMAND
     errmsg="usage: $TODO_SH $action task#"
     item=$1
     [ -z "$item" ] && die "$errmsg"
@@ -1443,7 +1443,7 @@ EndUsage
     $EDITOR $file
 
        cleanup;;
-"modify" | "mod")
+"modify" | "mod") # COMMAND
     errmsg="usage: $TODO_SH $action task#"
     modified=0
     item=$1
@@ -1588,14 +1588,14 @@ x
     fi
 done # while true
        cleanup;;
-"move" | "mv")
+"move" | "mv") # COMMAND
     echo "action is $action"
     echo "left is $*"
        cleanup;;
-"list" | "ls")
+"list" | "ls") # COMMAND
     list "$@"
        cleanup;;
-"liststat" | "lists")
+"liststat" | "lists") # COMMAND
    ## if - is given, e.g. -open, then all but open are shown
     #valid="|open|closed|started|stopped|canceled|"
     valid="|OPE|CLO|STA|STO|CAN|"
@@ -1641,7 +1641,7 @@ done # while true
         | eval ${TSV_SORT_COMMAND}           \
         | pretty_print
     ;;
-"select" | "sel")
+"select" | "sel") # COMMAND
     ## lists titles for a key and value
     ## keys are  status date_created severity type
     valid="|status|date_created|severity|type|"
@@ -1657,7 +1657,7 @@ done # while true
     showtitles_where $*
     
     ;;
-"selectm" | "selm")
+"selectm" | "selm") # COMMAND
     valid="|status|date_created|severity|type|"
     errmsg="usage: $TODO_SH $action \"type: bug\" \"status: open\" ..."
     [ -z "$1" ] && die "$errmsg"
@@ -1678,7 +1678,7 @@ done # while true
     
     ;;
     # XXX
-"tsvselectm" | "tsvselm")
+"tsvselectm" | "tsvselm") # COMMAND
     valid="|status|date_created|severity|type|"
     errmsg="usage: $TODO_SH $action \"type: BUG\" \"status: OPE\" ..."
     [ -z "$1" ] && die "$errmsg"
@@ -1725,7 +1725,7 @@ done # while true
     grep -P "$regex" "$TSV_FILE"
     
     ;;
-"lbs")
+"lbs") # COMMAND
     OLDLIST=$FILELIST
     tasks=$(grep -l -m 1 "^severity: CRI" $FILELIST)
     #echo "tasks $tasks"
@@ -1745,7 +1745,7 @@ done # while true
     FILELIST=$tasks
     [ -z "$FILELIST" ] || print_tasks
     ;;
-"tsvlbs")
+"tsvlbs") # COMMAND
     tsv_headers
     words="CRI SER NOR"
     ctr=1
@@ -1765,13 +1765,13 @@ done # while true
     
     ;;
     "ope" | "sta" | "clo" | "can" | "sto" | \
-    "open" | "started" | "closed" | "canceled" | "stopped" )
+    "open" | "started" | "closed" | "canceled" | "stopped" ) # COMMAND
     [ ${#action} -eq 3 ] && action=$(echo "$action" | sed 's/can/canceled/;s/clo/closed/;s/sto/stopped/;s/ope/open/')
         item=$1
         change_status $item "$action"
         ;;
 
-    "pri" )
+    "pri" ) # COMMAND
 
     errmsg="usage: $TODO_SH $action ITEM# PRIORITY
 note: PRIORITY must be anywhere from A to Z."
@@ -1800,7 +1800,7 @@ note: PRIORITY must be anywhere from A to Z."
     #    die "$errmsg"
     #fi;;
         ;;
-        "depri")
+        "depri") # COMMAND
         errmsg="usage: $TODO_SH $action ITEM#"
         common_validation $1 $errmsg 
         get_title
@@ -1814,7 +1814,7 @@ note: PRIORITY must be anywhere from A to Z."
         cleanup
         ;;
 
-        "showold" )
+        "showold" ) # COMMAND
         # TODO validate fields given
         ## this is slow since each file is opened and each field is grepped
         # time will be proportional to # of bugs
@@ -1827,13 +1827,13 @@ note: PRIORITY must be anywhere from A to Z."
 #            show_info1 $item $fields
 #        done
         ;;
-        "show" )
+        "show" ) # COMMAND
         errmsg="usage: $TODO_SH show ITEM#"
         common_validation $1 $errmsg
         data=$( sed "s/^\([a-z0-9_]*\):\(.*\)/$PRI_A\1:$DEFAULT\2/g;" $file )
         echo -e "$data"
         ;;
-        "tsvshow" )
+        "tsvshow" ) # COMMAND
         errmsg="usage: $TODO_SH show ITEM#"
         common_validation $1 $errmsg
 
@@ -1896,7 +1896,7 @@ note: PRIORITY must be anywhere from A to Z."
         done
 
         ;;
-        "ll" | "longlist" )
+        "ll" | "longlist" ) # COMMAND
         # TODO validate fields given
         # TODO titles
         fields="$*"
@@ -1904,7 +1904,7 @@ note: PRIORITY must be anywhere from A to Z."
         show_info4 $fields
         ;;
 
-        "ll1" )
+        "ll1" ) # COMMAND
         ## FASTEST
         # this uses egrep and is very fast compared to show which selects each field
         # however, no control over order of fields
@@ -1941,7 +1941,7 @@ note: PRIORITY must be anywhere from A to Z."
         done
 
         ;;
-        "ll2" )
+        "ll2" ) # COMMAND
         # this is a modification of ll1 and does give the data in requested field order
         fields="$*"
         fields=${fields:-"id status severity type title"}
@@ -1975,15 +1975,16 @@ note: PRIORITY must be anywhere from A to Z."
         done
 
         ;;
-        "viewlog" | "viewcomment" )
+        "viewlog" | "viewcomment" ) # COMMAND
         errmsg="usage: $TODO_SH $action ITEM#"
         common_validation $1 $errmsg 
         field=${action:4}
-        data=`extract_header $field $file`
+        #data=`extract_header $field $file`
+        data=$( get_extra_data $item $field )
         echo "$data"
 
         ;;
-        "comment" | "addcomment" )
+        "comment" | "addcomment" ) # COMMAND
         errmsg="usage: $TODO_SH $action ITEM#"
         common_validation $1 $errmsg 
         cp $file $file.bak
@@ -1995,7 +1996,7 @@ note: PRIORITY must be anywhere from A to Z."
                 }
         cleanup
         ;;
-        "upcoming" | "upc" )
+        "upcoming" | "upc" ) # COMMAND
             tasks=$(egrep -l -m 1 $FLAG "^status: (started|open)" $FILELIST)
             RESULT="ax"
             export RESULT
@@ -2014,7 +2015,7 @@ note: PRIORITY must be anywhere from A to Z."
                 echo "$ii $due_date ${status:0:3} ${severity:0:3} ${itype:0:3} $title"
             done
             ;;
-        "upcoming2" | "upc2" )
+        "upcoming2" | "upc2" ) # COMMAND
         # uses hash_data but is slow
             tasks=$(egrep -l -m 1 $FLAG "^status: (started|open)" $FILELIST)
             output=""
@@ -2073,7 +2074,7 @@ note: PRIORITY must be anywhere from A to Z."
                 fi
             done
             ;;
-            "archive" | "ar" )
+            "archive" | "ar" ) # COMMAND
             # TODO move other files also into archive
             ARCHIVE_FILE="archive.txt"
             regex="${REG_ID}${DELIM}CLO"
