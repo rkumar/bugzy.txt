@@ -2078,11 +2078,21 @@ note: PRIORITY must be anywhere from A to Z."
             ARCHIVE_FILE="archive.txt"
             regex="${REG_ID}${DELIM}CLO"
             count=$( grep -c -P "$regex" "$TSV_FILE" )
+            toarch=$( grep -P "$regex" "$TSV_FILE" | cut -f1 | sed 's/^ //g' )
             if [[ $count > 0 ]]; 
             then  
                 grep -P "$regex" "$TSV_FILE" >> "$ARCHIVE_FILE"
                 sed -i.bak "/$regex/d" "$TSV_FILE"
                 echo "$count row/s archived to $ARCHIVE_FILE";
+                echo "cleaning other/older files: $toarch"
+                [ ! -d "archived" ] && mkdir archived;
+                for f in $toarch
+                do
+                    echo "$f"
+                    [ -f "$f.txt" ] && mv "$f.txt" archived/
+                    mv $f.*.txt archived/
+                    rm $f.*bak
+                done
             else 
                 echo "nothing to archive";
             fi
