@@ -45,7 +45,7 @@ usage()
 EndUsage
     exit 1
 }
-help()
+help() # COMMAND
 {
     sed -e 's/^    //' <<EndHelp
       Usage: $oneline_usage
@@ -300,6 +300,80 @@ extract_header()
 
 shopt -s extglob
 list()
+{
+    ## Prefix the filter_command with the pre_filter_command
+    filter_command="${pre_filter_command:-}"
+    #echo "list 1 FILELIST: $FILELIST"
+    #echo "list 2 FILELIST: $FILELIST"
+
+
+    [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: list : $@"
+    for search_term in "$@"
+    do
+    [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: search_term is $search_term "
+        ## See if the first character of $search_term is a dash
+        if [ ${search_term:0:1} == '=' ]
+        then
+            filter_command="${filter_command:-} ${filter_command:+|} \
+            grep \"${search_term:1}\" "
+        else
+            if [ ${search_term:0:1} != '-' ]
+            then
+                ## First character isn't a dash: hide lines that don't match
+                ## this $search_term
+                filter_command="${filter_command:-} ${filter_command:+|} \
+                grep -i \"$search_term\" "
+            else
+                ## First character is a dash: hide lines that match this
+                ## $search_term
+                #
+                ## Remove the first character (-) before adding to our filter command
+                filter_command="${filter_command:-} ${filter_command:+|} \
+                grep -v -i \"${search_term:1}\" "
+            fi
+        fi
+    done
+    [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: filter_command is $filter_command "
+
+    ## If post_filter_command is set, append it to the filter_command
+    [ -n "$post_filter_command" ] && {
+        filter_command="${filter_command:-}${filter_command:+ | }${post_filter_command:-}"
+    }
+    width=$( tput cols )
+    let width-=3
+        # cat "$TSV_FILE" \
+    formatted_tsv_headers 
+        items=$(
+        cut -c1-$width "$TSV_FILE" \
+        | eval ${TSV_SORT_COMMAND}           \
+        | pretty_print
+          )
+    if [ "${filter_command}" ]; then
+        filtered_items=$(echo -ne "$items" | eval ${filter_command})
+    else
+        filtered_items=$items
+    fi
+    echo -ne "$filtered_items\n"
+
+    if [ $VERBOSE_FLAG -gt 0 ]; then
+        NUMTASKS=$( echo -ne "$filtered_items" | sed -n '$ =' )
+        #TOTALTASKS=$( echo -ne "$items" | sed -n '$ =' )
+        # we can do ls +(0-9).txt but not sure how portable and requires extglob
+        #TOTALTASKS=$( ls $ISSUES_DIR/*.txt | grep "[0-9]\+\.txt" | wc -l )
+        # tsv stuff OLD above
+        TOTALTASKS=$( grep -c . "$TSV_FILE" )
+
+        # footer
+
+        echo "--"
+        #echo "${NUMTASKS:-0} of ${TOTALTASKS:-0} issues shown from $ISSUES_DIR"
+        echo "${NUMTASKS:-0} of ${TOTALTASKS:-0} issues shown from $TSV_FILE"
+
+        cut -f2 "$TSV_FILE" | awk  '{a[$1] ++} END{for (i in a) print i": "a[i]}' | \
+        sed 's/CAN/canceled/;s/CLO/closed/;s/STO/stopped/;s/OPE/open/;s/STA/started/'
+    fi
+}
+oldlist()
 {
     ## Prefix the filter_command with the pre_filter_command
     filter_command="${pre_filter_command:-}"
@@ -946,14 +1020,14 @@ tsv_get_rowdata(){
     item="$1"
     paditem=$( printf "%4s" $item )
     rowdata=$( grep "^$paditem" "$TSV_FILE" )
-    [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; return -1;}
+    [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; return 99;}
     echo "$rowdata"
 }
 tsv_get_rowdata_with_lineno(){
     item="$1"
     paditem=$( printf "%4s" $item )
     rowdata=$( grep -n "^$paditem" "$TSV_FILE" )
-    [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; return -1;}
+    [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; return 99;}
     rowdata=$( cut -d':' -f2- <<< "$rowdata" )
     lineno=$( cut -d':' -f1 <<< "$rowdata" )
     echo "$rowdata"
@@ -1043,6 +1117,13 @@ tsv_set_column_value(){
     position=`tsv_column_index "$columnname"`
     #echo "position:$position"
     newrow=$( echo "$row" | tr '\t' '\n' | sed $position"s/.*/$newvalue/" | tr '\n' '\t' )
+    res=$?
+    if [ $res -ne 0 ];
+    then
+        echo "Some error in conversion, can't proceed with operation"
+        return $res
+    fi
+    [ -z "$newrow" ] && { echo "conversion resulted in a blank, can't go on. Program error!"; return 99;}
     newrow=$( echo "$newrow" | sed "s/$DELIM$//" )
     # could use $o
     #var=$(echo ${var%\t})
@@ -1296,10 +1377,10 @@ action=$( printf "%s\n" "$ACTION" | tr 'A-Z' 'a-z' )
 shift
 
 case $action in
-    "print" ) # COMMAND
+    "print" ) # COMMAND: print details of one item
     print_item $1
     ;;
-"add" | "a") # COMMAND
+"add" | "a") # COMMAND: add an item (bug/task/enhancement)
     if [[ -z "$1" ]]; then
         echo -n "Enter a short title/subject: "
         read atitle
@@ -1331,9 +1412,15 @@ case $action in
     i_due_date=`convert_due_date "$DEFAULT_DUE_DATE"`
     [ "$PROMPT_DUE_DATE" == "yes" ] && {
         [ ! -z "$i_due_date" ] && prompts=" [default is $i_due_date]"
-        echo -n "Enter a due date $prompts: "
+        echo "Enter a due date $prompts: "
+        echo "(You may enter values like 'tomorrow' or '+3 days')"
         read due_date
-        [ ! -z "$due_date" ] && i_due_date=`convert_due_date "$due_date"`
+        [ ${due_date:0:1} == '+' ] && conversion_done=1;
+        [ ! -z "$due_date" ] && i_due_date=$( convert_due_date "$due_date" )
+        if [[ $conversion_done == 1 ]];
+        then
+            echo "Due date converted to $due_date"
+        fi
     }
     [  -z "$i_due_date" ] && i_due_date=" "
     i_due_date=$( printf "%-16s" "$i_due_date" )
@@ -1412,7 +1499,7 @@ EndUsage
     echo "Created $serialid"
 
        cleanup;;
-"del" | "rm") # COMMAND
+"del" | "rm") # COMMAND: delete an item
     errmsg="usage: $TODO_SH $action task#"
     item=$1
     common_validation $1 $errmsg
@@ -1443,7 +1530,7 @@ EndUsage
     $EDITOR $file
 
        cleanup;;
-"modify" | "mod") # COMMAND
+       "modify" | "mod") # COMMAND: modify fields of an item
     errmsg="usage: $TODO_SH $action task#"
     modified=0
     item=$1
@@ -1523,7 +1610,12 @@ EndUsage
                 ;;
             "due_date" )
             read due_date
+            [ ${due_date:0:1} == '+' ] && conversion_done=1;
             [ ! -z "$due_date" ] && { due_date=`convert_due_date "$due_date"`
+            if [[ $conversion_done == 1 ]];
+            then
+                echo "Due date converted to $due_date"
+            fi
             text="$due_date"
                    sed -i.bak "/^$reply:/s/^.*$/$reply: $text/" $file
                    tsv_set_column_value $item "due_date" "$text"
@@ -1588,14 +1680,14 @@ x
     fi
 done # while true
        cleanup;;
-"move" | "mv") # COMMAND
-    echo "action is $action"
-    echo "left is $*"
+       "move" | "mv") # COMMAND: not implemented
+       echo "action is $action"
+       echo "left is $*"
        cleanup;;
-"list" | "ls") # COMMAND
-    list "$@"
+       "list" | "ls") # COMMAND: list, uses old flat files
+       list "$@"
        cleanup;;
-"liststat" | "lists") # COMMAND
+       "liststat" | "lists") # COMMAND: lists items for a given status (old file)
    ## if - is given, e.g. -open, then all but open are shown
     #valid="|open|closed|started|stopped|canceled|"
     valid="|OPE|CLO|STA|STO|CAN|"
@@ -1617,8 +1709,7 @@ done # while true
     tasks=$(grep -l -m 1 $FLAG "^status: *$status" $FILELIST)
     greptitles $tasks 
     ;;
-    # XXX
-    "tsvlists" )
+    "tsvlists" ) #COMMAND: lists for a status 
     valid="|OPE|CLO|STA|STO|CAN|"
     errmsg="usage: $TODO_SH $action $valid"
     status=$1
