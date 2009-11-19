@@ -28,6 +28,8 @@ EXTRA_DATA_FILE="ext.txt"
 EDITFIELDS="title description status severity type assigned_to due_date comment fix"
 PRINTFIELDS="title id status severity type assigned_to date_created due_date"
 PRETTY_PRINT=1
+# should desc and comments be printed in "list" command
+PRINT_DETAILS=0
 TSV_OUTPUT_DELIMITER=" | "
 # input delimiter or IFS
 DELIM=$'\t'
@@ -353,7 +355,31 @@ list()
     else
         filtered_items=$items
     fi
-    echo -ne "$filtered_items\n"
+    if [ "$PRINT_DETAILS" == "1" ]; then
+        # while read row removes leading and trailing spaces !! FIXME
+        #echo -e "$filtered_items" | while read row
+        OLDIFS="$IFS"
+        IFS=$'\n'
+        for row in $( echo "$filtered_items" )
+        do
+            echo -ne "$row\n"
+            # ugly attempt to remove ascii stuff from first row
+            #rowitem=$( echo -e "$row" | cut -d $'|' -f1 | sed 's/....*m //;s/ $//' )
+            rowitem=$( echo -e "$row" | cut -d $'|' -f1 )
+            #     echo "1rowitem was ($rowitem)"
+            #rowitem=${rowitem%% *} ## trim trailing blanks spaces
+            rowitem=${rowitem// /}
+            if [[ "$rowitem" = +([0-9]) ]]; then  
+                get_extra_data $rowitem description | sed '1s/^/      Desc: /;2,$s/^/      >/g;'
+                get_extra_data $rowitem comment     | sed '1s/^/      Comments: /;2,$s/^/      >/g;'
+            else
+                echo "rowitem was ($rowitem)"
+            fi
+        done
+        IFS="$OLDIFS"
+    else
+        echo -ne "$filtered_items\n"
+    fi
 
     if [ $VERBOSE_FLAG -gt 0 ]; then
         NUMTASKS=$( echo -ne "$filtered_items" | sed -n '$ =' )
@@ -820,7 +846,7 @@ show_info4(){
         done
         ## ideally we should use a control break in case someone deletes a field
         ctr=0
-        echo "count: $count"
+        #echo "count: $count"
         echo -e "$str" | while read LINE
         do
             [ -z "$LINE" ] && continue;
@@ -1233,8 +1259,8 @@ pretty_print(){
         local data=$( sed -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
             -e  "s/${DELIM}CRI${DELIM}/${DELIM}${PRI_A}CRI${DEFAULT}${DELIM}/g" \
             -e  "s/${DELIM}SER${DELIM}/${DELIM}${PRI_A}SER${DEFAULT}${DELIM}/g" \
-            -e  "/${DELIM}${tomorrow}${DELIM}/s/.*/${PRI_A}&${DEFAULT}/g" \
-            -e  "/${DELIM}${dayafter}${DELIM}/s/.*/${PRI_B}&${DEFAULT}/g" \
+            -e  "/${DELIM}${tomorrow}${DELIM}/s/\(\[#.*\)/${PRI_A}\1${DEFAULT}/g" \
+            -e  "/${DELIM}${dayafter}${DELIM}/s/\(\[#.*\)/${PRI_B}\1${DEFAULT}/g" \
             -e  "s/${tomorrow}/${PRI_A}${tomorrow}${DEFAULT}/g" \
             -e  "s/${dayafter}/${PRI_B}${dayafter}${DEFAULT}/g" \
             -e "s/$DELIM/$TSV_OUTPUT_DELIMITER/g" 
@@ -1254,7 +1280,7 @@ get_extra_data(){
     # combined file approach
     regex="^$item:${reply:0:3}" 
     description=$( grep "^$item:${reply:0:3}" "$EXTRA_DATA_FILE"  | cut -d: -f3- )
-    echo "$description"
+    [ ! -z "$description" ] && echo "$description"
 }
 update_extra_data(){
     item=$1
@@ -1270,7 +1296,7 @@ update_extra_data(){
 out=
 file=
 Dflag=
-while getopts hpvVf:o:D:d:i: flag
+while getopts lhpvVf:o:D:d:i: flag
 do
     case "$flag" in
         (h) help; exit 0;;
@@ -1284,6 +1310,7 @@ do
         ;;
         (o) out="$OPTARG";;
         (D) Dflag="$Dflag $OPTARG";;
+        (l) PRINT_DETAILS=1;; # print desc and comments withing "list"
         d )
         PROG_CFG_FILE=$OPTARG
         ;;
@@ -1419,7 +1446,7 @@ case $action in
         [ ! -z "$due_date" ] && i_due_date=$( convert_due_date "$due_date" )
         if [[ $conversion_done == 1 ]];
         then
-            echo "Due date converted to $due_date"
+            echo "Due date converted to $_due_date"
         fi
     }
     [  -z "$i_due_date" ] && i_due_date=" "
@@ -1626,13 +1653,7 @@ EndUsage
                 }
             ;;
             "description" | "fix" )
-            # TODO tsv
                 description=$( get_extra_data $item $reply )
-                #description=`extract_header $reply $file`
-                # tsv stuff
-                #description=`cat $item.$reply.txt`
-                # combined file approach
-                #description=$( grep '^$item:${reply:0:3}' "$EXTRA_DATA_FILE"  | cut -d: -f3- )
                 oldvalue=$description
                 lines=$(echo "$description"  | wc -l)
                 [ -z "$description" ] && {
@@ -1685,6 +1706,7 @@ done # while true
        echo "left is $*"
        cleanup;;
        "list" | "ls") # COMMAND: list, uses old flat files
+       #PRINT_DETAILS=0
        list "$@"
        cleanup;;
        "liststat" | "lists") # COMMAND: lists items for a given status (old file)
@@ -2166,7 +2188,6 @@ note: PRIORITY must be anywhere from A to Z."
             done
             ;;
             "archive" | "ar" ) # COMMAND
-            # TODO move other files also into archive
             ARCHIVE_FILE="archive.txt"
             regex="${REG_ID}${DELIM}CLO"
             count=$( grep -c -P "$regex" "$TSV_FILE" )
