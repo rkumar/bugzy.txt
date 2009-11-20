@@ -253,10 +253,10 @@ function hash_foreach {
 IFS="$oldIFS"
 }
 
-hash_set "VALUES" "status" "open closed started stopped canceled "
+hash_set "VALUES" "status" "open started closed stopped canceled "
 hash_set "VALUES" "severity" "normal critical serious"
 hash_set "VALUES" "type" "bug feature enhancement task"
-hash_set "TSVVALUES" "status" "OPE CLO STA STO CAN"
+hash_set "TSVVALUES" "status" "OPE STA CLO STO CAN"
 hash_set "TSVVALUES" "severity" "NOR CRI SER"
 hash_set "TSVVALUES" "type" "BUG FEA ENH TAS"
 edit_tmpfile()
@@ -1444,11 +1444,11 @@ case $action in
         echo "Enter a due date $prompts: "
         echo "(You may enter values like 'tomorrow' or '+3 days')"
         read due_date
-        [ ${due_date:0:1} == '+' ] && conversion_done=1;
+        [[ ${due_date:0:1} == "+" ]] && conversion_done=1;
         [ ! -z "$due_date" ] && i_due_date=$( convert_due_date "$due_date" )
         if [[ $conversion_done == 1 ]];
         then
-            echo "Due date converted to $_due_date"
+            echo "Due date converted to $i_due_date"
         fi
     }
     [  -z "$i_due_date" ] && i_due_date=" "
@@ -1482,16 +1482,16 @@ case $action in
       tabseve=$( echo ${i_severity:0:3} | tr "a-z" "A-Z" )
       tabtype=$( echo ${i_type:0:3} | tr "a-z" "A-Z" )
     sed -e 's/^    //' <<EndUsage >"$editfile"
-    title: $todo
-    id: $serialid
+    title:        $todo
+    id:           $serialid
     description:
-    $i_desc
+                  $i_desc
     date_created: $now
-    status: $tabstat
-    severity: $tabseve
-    type: $tabtype
-    assigned_to: $ASSIGNED_TO
-    due_date: $i_due_date
+    status:       $tabstat
+    severity:     $tabseve
+    type:         $tabtype
+    assigned_to:  $ASSIGNED_TO
+    due_date:     $i_due_date
     comment: 
 
     fix: 
@@ -1639,7 +1639,7 @@ EndUsage
                 ;;
             "due_date" )
             read due_date
-            [ ${due_date:0:1} == '+' ] && conversion_done=1;
+            [[ ${due_date:0:1} == "+" ]] && conversion_done=1;
             [ ! -z "$due_date" ] && { due_date=`convert_due_date "$due_date"`
             if [[ $conversion_done == 1 ]];
             then
