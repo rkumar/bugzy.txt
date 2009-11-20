@@ -1314,6 +1314,18 @@ update_extra_data(){
     sed -i.bak "/^$item:${reply:0:3}:/d" "$EXTRA_DATA_FILE"
     echo "$i_desc_pref" >> "$EXTRA_DATA_FILE"
 }
+color_by_priority(){
+    data=$(
+         sed '''
+                s/\(.*(A).*\)/'$PRI_A'\1'$DEFAULT'/g;
+                s/\(.*(B).*\)/'$PRI_B'\1'$DEFAULT'/g;
+                s/\(.*(C).*\)/'$PRI_C'\1'$DEFAULT'/g;
+                s/\(.*([D-Z]).*\)/'$PRI_X'\1'$DEFAULT'/g;
+          '''                                                   
+          )
+          echo -e "$data"
+          
+      }
 
 ## ADD FUNCTIONS ABOVE
 out=
@@ -2252,7 +2264,7 @@ note: PRIORITY must be anywhere from A to Z."
 
             # put symbold in global vars so consistent TODO, color this based on priority
 "quick" | "q" ) # COMMAND a quick report showing status and title sorted on status
-            cut -c6-8,63- "$TSV_FILE" | sed 's/^OPE/- /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g;s/CAN/x /g' | sort -k1,1 -k3,3
+            cut -c6-8,63- "$TSV_FILE" | sed 's/^OPE/- /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g;s/CAN/x /g' | sort -k1,1 -k3,3 | color_by_priority
             ;;
 
 "grep" ) # COMMAND uses egrep to run a quick report showing status and title sorted on status
