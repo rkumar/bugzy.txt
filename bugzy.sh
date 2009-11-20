@@ -685,9 +685,10 @@ change_status()
     # TODO tsv
     oldvalue=`tsv_get_column_value $item $reply`
     #oldvalue=`get_value_for_id $item $reply`
-    [ "$oldvalue" == "$action" ] && die "$item is already $oldvalue"
     var=$( printf "%s" "${action:0:3}" | tr 'a-z' 'A-Z' )
-    echo "$item is currently $oldvalue"
+    oldvaluelong=`convert_short_to_long_code "status" $oldvalue`
+    [ "$oldvalue" == "$var" ] && die "$item is already $oldvalue ($oldvaluelong)"
+    echo "$item is currently $oldvalue ($oldvaluelong)"
         newcode=`convert_long_to_short_code $input`
         newline="$reply: $newcode"
         now=`date "$DATE_FORMAT"`
@@ -695,8 +696,8 @@ change_status()
         # tsv stuff
         newcode=`convert_long_to_short_code $input`
         tsv_set_column_value $item $reply $newcode
-        echo "$item is now $input ($newcode)"
-        log_changes $reply "$oldvalue" $input $file
+        echo "$item is now $newcode ($input)"
+        log_changes $reply "$oldvalue" $newcode $file
         #mtitle=`get_title $item`
         mtitle=`tsv_get_title $item`
         [ ! -z "$EMAIL_TO" ] && cat "$file" | mail -s "[$var] $mtitle" $EMAIL_TO
@@ -707,6 +708,8 @@ change_status()
 common_validation()
 {
     item=$1
+    # added paditem, so we don't need to keep doing it. 2009-11-20 19:37 
+    paditem=$( printf "%4s" $item )
     shift
     local errmsg="$*"
     #local argct=${3:-2}
@@ -1887,12 +1890,11 @@ done # while true
     for item in "$@"
     do
         #item=$1
-        echo "$item"
         change_status $item "$action"
     done
         ;;
 
-    "pri" ) # COMMAND
+    "pri" ) # COMMAND: give priority to a task, appears in title and colored and sorted in some reports
 
     errmsg="usage: $TODO_SH $action ITEM# PRIORITY
 note: PRIORITY must be anywhere from A to Z."
@@ -2217,12 +2219,25 @@ note: PRIORITY must be anywhere from A to Z."
             fi
             ;;
             "quick" | "q" ) # COMMAND a quick report showing status and title sorted on status
-            cut -c6-8,63- "$TSV_FILE" | sed 's/^OPE/_ /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g' | sort -k1,1
+            cut -c6-8,63- "$TSV_FILE" | sed 's/^OPE/_ /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g;s/CAN/x /g' | sort -k1,1
             ;;
+
             "grep" ) # COMMAND uses egrep to run a quick report showing status and title sorted on status
             regex="$@"
             [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: grep : $@"
             egrep "$@" "$TSV_FILE" | cut -c6-8,63-  |  sed 's/^OPE/_ /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g' | sort -k1,1
+            ;;
+
+            "tag" ) # COMMAND: adds a tag at end of title, with '@' prefixed, helps in searching.
+            tag="@$1"
+            errmsg="usage: $TODO_SH $action TAG ITEM#"
+            shift
+            for item in "$@"
+            do
+                common_validation $item "$errmsg"
+                sed -i.bak "/^$paditem/s/.*/& $tag/" "$TSV_FILE"
+                [ "$?" -eq 0 ] && echo "Tagged $item with $tag";
+            done
             ;;
 
 
