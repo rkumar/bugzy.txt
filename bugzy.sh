@@ -77,10 +77,11 @@ help() # COMMAND
         help
           Display this help message.
 
-        list [TERM...]
-        ls [TERM...]
+        list [-l] [TERM...]
+        ls [-l] [TERM...]
           Displays all bug's that contain TERM(s) sorted by priority with line
-          numbers.  If no TERM specified, lists entire todo.txt.
+          numbers.  If no TERM specified, lists all items.
+          The -l option results in descriptions, comments and fix being printed also.
 
         longlist [Fields ...]
         ll type id severity status title
@@ -116,6 +117,19 @@ help() # COMMAND
        selectm "type: bug" "status: open" ...
        selm "type=bug" "status=(open|started)" "severity=critical"
           A multiple criteria search.
+
+       grep
+          takes a regex and searches the entire record using egrep and prints matches
+
+       quick
+       q
+          Prints a list of titles with status on left.
+
+       tag TAG item1 item1 ...
+          Appends a tag to multiple items, prefixed with @
+
+       print item#
+          Prints details of given item
 
 
 
@@ -301,7 +315,8 @@ extract_header()
 
 
 shopt -s extglob
-list()
+# this is the new list. earlier on is now oldlist
+_list()
 {
     ## Prefix the filter_command with the pre_filter_command
     filter_command="${pre_filter_command:-}"
@@ -480,7 +495,7 @@ oldlist()
 DUMMY
     fi
 }
-greptitles()
+oldgreptitles()
 {
     files=$*
     #echo "files: $files"
@@ -489,19 +504,19 @@ greptitles()
     #grep -h title $files | cut -c 8-
     FILELIST=$files
     #echo "greptitles FILELIST: $FILELIST"
-    list
+    oldlist
 }
-showtitles_where()
+oldshowtitles_where()
 {
     key=$1
     value=$2
     #tasks=$(grep -l "$key:.*$value" $ISSUES_DIR/*.txt)
     tasks=$(grep -l "^$key:.*$value" $FILELIST)
-    greptitles $tasks 
+    oldgreptitles $tasks 
 }
 ## a lot of problems passing crit with spaces in it
 ## send in criteria in one strnig and count of criteria.
-showtitles_where_multi()
+oldshowtitles_where_multi()
 {
     local crit=$1
     local ctr=$2
@@ -516,9 +531,9 @@ showtitles_where_multi()
         [ $matches -eq $ctr ] && files="$files $file"
     done
     #echo "files: $files"
-    greptitles $files
+    oldgreptitles $files
 }
-print_tasks()
+oldprint_tasks()
 {
     [ -z "$FILELIST" ] && echo "No matching files" && exit 0
 #    echo "coming in with $FILELIST"
@@ -789,9 +804,9 @@ get_display_widths()
     case "$field" in
         "title" ) RESULT=40;;
         "id" ) RESULT=5;;
-        "status" ) RESULT=8;;
-        "severity" ) RESULT=8;;
-        "type" ) RESULT=8;;
+        "status" ) RESULT=5;;
+        "severity" ) RESULT=5;;
+        "type" ) RESULT=5;;
         * ) RESULT=10;;
     esac
 }
@@ -1265,6 +1280,7 @@ pretty_print(){
             -e  "s/${DELIM}CRI${DELIM}/${DELIM}${PRI_A}CRI${DEFAULT}${DELIM}/g" \
             -e  "s/${DELIM}SER${DELIM}/${DELIM}${PRI_A}SER${DEFAULT}${DELIM}/g" \
             -e  "/^....${DELIM}CLO${DELIM}/s/^ /x/g" \
+            -e  "/^....${DELIM}CAN${DELIM}/s/^ /x/g" \
             -e  "/^....${DELIM}OPE${DELIM}/s/^ /_/g" \
             -e  "/${DELIM}${tomorrow}${DELIM}/s/\(\[#.*\)/${PRI_A}\1${DEFAULT}/g" \
             -e  "/${DELIM}${dayafter}${DELIM}/s/\(\[#.*\)/${PRI_B}\1${DEFAULT}/g" \
@@ -1486,17 +1502,19 @@ case $action in
       tabstat=$( echo ${i_status:0:3} | tr "a-z" "A-Z" )
       tabseve=$( echo ${i_severity:0:3} | tr "a-z" "A-Z" )
       tabtype=$( echo ${i_type:0:3} | tr "a-z" "A-Z" )
+
+      ## CAUTION: programs that use this require one space aftr colon, don't reformat this
     sed -e 's/^    //' <<EndUsage >"$editfile"
-    title:        $todo
-    id:           $serialid
+    title: $todo
+    id: $serialid
     description:
-                  $i_desc
+                $i_desc
     date_created: $now
-    status:       $tabstat
-    severity:     $tabseve
-    type:         $tabtype
-    assigned_to:  $ASSIGNED_TO
-    due_date:     $i_due_date
+    status: $tabstat
+    severity: $tabseve
+    type: $tabtype
+    assigned_to: $ASSIGNED_TO
+    due_date: $i_due_date
     comment: 
 
     fix: 
@@ -1531,8 +1549,8 @@ EndUsage
         [ ! -z "$EMAIL_TO" ] && cat "$editfile" | mail -s "$todo" $EMAIL_TO
     }
     echo "Created $serialid"
-
        cleanup;;
+
 "del" | "rm") # COMMAND: delete an item
     errmsg="usage: $TODO_SH $action task#"
     item=$1
@@ -1552,8 +1570,8 @@ EndUsage
     tsv_delete_item $item
     [ ! -z "$EMAIL_TO" ] && echo -e "$body" | mail -s "[DEL] $mtitle" $EMAIL_TO
     
-
        cleanup;;
+
 "edit" | "ed") # COMMAND
     errmsg="usage: $TODO_SH $action task#"
     item=$1
@@ -1564,7 +1582,8 @@ EndUsage
     $EDITOR $file
 
        cleanup;;
-       "modify" | "mod") # COMMAND: modify fields of an item
+
+"modify" | "mod") # COMMAND: modify fields of an item
     errmsg="usage: $TODO_SH $action task#"
     modified=0
     item=$1
@@ -1708,15 +1727,23 @@ x
     fi
 done # while true
        cleanup;;
-       "move" | "mv") # COMMAND: not implemented
+
+"move" | "mv") # COMMAND: not implemented
        echo "action is $action"
        echo "left is $*"
        cleanup;;
-       "list" | "ls") # COMMAND: list, uses old flat files
+
+"list" | "ls") # COMMAND: list, uses old flat files (now new), use -l for details
        #PRINT_DETAILS=0
-       list "$@"
+       _list "$@"
        cleanup;;
-       "liststat" | "lists") # COMMAND: lists items for a given status (old file)
+
+"oldlist" ) # COMMAND: list, uses old flat files 
+       #PRINT_DETAILS=0
+       oldlist "$@"
+       cleanup;;
+
+"oldliststat" | "oldlists") # COMMAND: lists items for a given status (old file)
    ## if - is given, e.g. -open, then all but open are shown
     #valid="|open|closed|started|stopped|canceled|"
     valid="|OPE|CLO|STA|STO|CAN|"
@@ -1736,9 +1763,10 @@ done # while true
     count=$(echo $valid | grep -c $status)
     [ $count -eq 1 ] || die "$errmsg"
     tasks=$(grep -l -m 1 $FLAG "^status: *$status" $FILELIST)
-    greptitles $tasks 
+    oldgreptitles $tasks 
     ;;
-    "tsvlists" ) #COMMAND: lists for a status 
+
+    "liststat" | "lists" ) #COMMAND: lists items for a given status 
     valid="|OPE|CLO|STA|STO|CAN|"
     errmsg="usage: $TODO_SH $action $valid"
     status=$1
@@ -1761,7 +1789,8 @@ done # while true
         | eval ${TSV_SORT_COMMAND}           \
         | pretty_print
     ;;
-"select" | "sel") # COMMAND
+
+"oldselect" | "oldsel") # COMMAND: oldfile
     ## lists titles for a key and value
     ## keys are  status date_created severity type
     valid="|status|date_created|severity|type|"
@@ -1774,10 +1803,10 @@ done # while true
 
     count=$(echo $valid | grep -c $key)
     [ $count -eq 1 ] || die "$errmsg"
-    showtitles_where $*
+    oldshowtitles_where $*
     
     ;;
-"selectm" | "selm") # COMMAND
+"oldselectm" | "oldselm") # COMMAND
     valid="|status|date_created|severity|type|"
     errmsg="usage: $TODO_SH $action \"type: bug\" \"status: open\" ..."
     [ -z "$1" ] && die "$errmsg"
@@ -1794,11 +1823,11 @@ done # while true
         crit="$crit|$ii"
         let ctr+=1
     done
-    showtitles_where_multi "$crit" $ctr
+    oldshowtitles_where_multi "$crit" $ctr
     
     ;;
-    # XXX
-"tsvselectm" | "tsvselm") # COMMAND
+    # TODO format the output
+"selectm" | "selm") # COMMAND: allows multiple criteria selection key value
     valid="|status|date_created|severity|type|"
     errmsg="usage: $TODO_SH $action \"type: BUG\" \"status: OPE\" ..."
     [ -z "$1" ] && die "$errmsg"
@@ -1845,7 +1874,8 @@ done # while true
     grep -P "$regex" "$TSV_FILE"
     
     ;;
-"lbs") # COMMAND
+
+"oldlbs") # COMMAND
     OLDLIST=$FILELIST
     tasks=$(grep -l -m 1 "^severity: CRI" $FILELIST)
     #echo "tasks $tasks"
@@ -1865,7 +1895,10 @@ done # while true
     FILELIST=$tasks
     [ -z "$FILELIST" ] || print_tasks
     ;;
-"tsvlbs") # COMMAND
+
+    # TODO formatting required
+    # redo : sort on crit and colorize
+"lbs") # COMMAND
     tsv_headers
     words="CRI SER NOR"
     ctr=1
@@ -1882,8 +1915,8 @@ done # while true
         let ctr+=1
     done
 
-    
     ;;
+    
     "ope" | "sta" | "clo" | "can" | "sto" | \
     "open" | "started" | "closed" | "canceled" | "stopped" ) # COMMAND change status of given item/s
     [ ${#action} -eq 3 ] && action=$(echo "$action" | sed 's/can/canceled/;s/clo/closed/;s/sto/stopped/;s/ope/open/')
@@ -1894,7 +1927,7 @@ done # while true
     done
         ;;
 
-    "pri" ) # COMMAND: give priority to a task, appears in title and colored and sorted in some reports
+"pri" ) # COMMAND: give priority to a task, appears in title and colored and sorted in some reports
 
     errmsg="usage: $TODO_SH $action ITEM# PRIORITY
 note: PRIORITY must be anywhere from A to Z."
@@ -1923,7 +1956,7 @@ note: PRIORITY must be anywhere from A to Z."
     #    die "$errmsg"
     #fi;;
         ;;
-        "depri") # COMMAND
+"depri") # COMMAND
         errmsg="usage: $TODO_SH $action ITEM#"
         common_validation $1 $errmsg 
         sed  -i.bak "s/^\(title: \[.*\]\) (.)/\1/" $file
@@ -1935,26 +1968,14 @@ note: PRIORITY must be anywhere from A to Z."
         cleanup
         ;;
 
-        "showold" ) # COMMAND
-        # TODO validate fields given
-        ## this is slow since each file is opened and each field is grepped
-        # time will be proportional to # of bugs
-        fields="$*"
-        fields=${fields:-"id status severity type title"}
-        show_info3 $fields
-#        ids=$( grep -h '^id:' $FILELIST | cut -c 5- )
-#        for item in $ids
-#        do
-#            show_info1 $item $fields
-#        done
-        ;;
-        "show" ) # COMMAND
+"oldshow" ) # COMMAND
         errmsg="usage: $TODO_SH show ITEM#"
         common_validation $1 $errmsg
         data=$( sed "s/^\([a-z0-9_]*\):\(.*\)/$PRI_A\1:$DEFAULT\2/g;" $file )
         echo -e "$data"
         ;;
-        "tsvshow" ) # COMMAND
+
+"show" ) # COMMAND
         errmsg="usage: $TODO_SH show ITEM#"
         common_validation $1 $errmsg
 
@@ -2017,7 +2038,7 @@ note: PRIORITY must be anywhere from A to Z."
         done
 
         ;;
-        "ll" | "longlist" ) # COMMAND
+"oldll" | "oldlonglist" ) # COMMAND
         # TODO validate fields given
         # TODO titles
         fields="$*"
@@ -2025,7 +2046,8 @@ note: PRIORITY must be anywhere from A to Z."
         show_info4 $fields
         ;;
 
-        "ll1" ) # COMMAND
+        # headers and some formatting XXX
+"oldll1" ) # COMMAND
         ## FASTEST
         # this uses egrep and is very fast compared to show which selects each field
         # however, no control over order of fields
@@ -2062,7 +2084,8 @@ note: PRIORITY must be anywhere from A to Z."
         done
 
         ;;
-        "ll2" ) # COMMAND
+
+"oldll2" ) # COMMAND: prints fields in requested order
         # this is a modification of ll1 and does give the data in requested field order
         fields="$*"
         fields=${fields:-"id status severity type title"}
@@ -2096,7 +2119,7 @@ note: PRIORITY must be anywhere from A to Z."
         done
 
         ;;
-        "viewlog" | "viewcomment" ) # COMMAND
+"viewlog" | "viewcomment" ) # COMMAND
         errmsg="usage: $TODO_SH $action ITEM#"
         common_validation $1 $errmsg 
         field=${action:4}
@@ -2105,7 +2128,7 @@ note: PRIORITY must be anywhere from A to Z."
         echo "$data"
 
         ;;
-        "comment" | "addcomment" ) # COMMAND
+"comment" | "addcomment" ) # COMMAND
         errmsg="usage: $TODO_SH $action ITEM#"
         common_validation $1 $errmsg 
         cp $file $file.bak
@@ -2117,8 +2140,11 @@ note: PRIORITY must be anywhere from A to Z."
                 }
         cleanup
         ;;
-        "upcoming" | "upc" ) # COMMAND
-            tasks=$(egrep -l -m 1 $FLAG "^status: (started|open)" $FILELIST)
+
+        # TODO format the output or knock this off 
+"oldupcoming" | "oldupc" ) # COMMAND: shows started and open tasks
+            #tasks=$(egrep -l -m 1 $FLAG "^status: (started|open)" $FILELIST)
+            tasks=$(egrep -l -m 1 $FLAG "^status: (STA|OPE)" $FILELIST)
             RESULT="ax"
             export RESULT
             for ii in $tasks
@@ -2136,9 +2162,11 @@ note: PRIORITY must be anywhere from A to Z."
                 echo "$ii $due_date ${status:0:3} ${severity:0:3} ${itype:0:3} $title"
             done
             ;;
-        "upcoming2" | "upc2" ) # COMMAND
+
+            #TODO format or knock off but this uses old flat file
+"oldupcoming2" | "oldupc2" ) # COMMAND
         # uses hash_data but is slow
-            tasks=$(egrep -l -m 1 $FLAG "^status: (started|open)" $FILELIST)
+            tasks=$(egrep -l -m 1 $FLAG "^status: (STA|OPE)" $FILELIST)
             output=""
             for ii in $tasks
             do
@@ -2164,7 +2192,9 @@ note: PRIORITY must be anywhere from A to Z."
             done
             echo -e "$output" | sort -k2
             ;;
-            "tsvupc" )
+
+            #TODO headers and pipe separator
+"upcoming" | "upc" ) # COMMAND: shows upcoming tasks
             # now check field 7, convert to unix epoch and compare to now, if greater.
             # if less then break out, no more printing
             now=`date '+%Y-%m-%d'`
@@ -2195,7 +2225,8 @@ note: PRIORITY must be anywhere from A to Z."
                 fi
             done
             ;;
-            "archive" | "ar" ) # COMMAND
+
+"archive" | "ar" ) # COMMAND: move closed bugs, what about canceled ? XXX
             ARCHIVE_FILE="archive.txt"
             regex="${REG_ID}${DELIM}CLO"
             count=$( grep -c -P "$regex" "$TSV_FILE" )
@@ -2218,17 +2249,19 @@ note: PRIORITY must be anywhere from A to Z."
                 echo "nothing to archive";
             fi
             ;;
-            "quick" | "q" ) # COMMAND a quick report showing status and title sorted on status
-            cut -c6-8,63- "$TSV_FILE" | sed 's/^OPE/_ /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g;s/CAN/x /g' | sort -k1,1
+
+            # put symbold in global vars so consistent TODO, color this based on priority
+"quick" | "q" ) # COMMAND a quick report showing status and title sorted on status
+            cut -c6-8,63- "$TSV_FILE" | sed 's/^OPE/- /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g;s/CAN/x /g' | sort -k1,1 -k3,3
             ;;
 
-            "grep" ) # COMMAND uses egrep to run a quick report showing status and title sorted on status
+"grep" ) # COMMAND uses egrep to run a quick report showing status and title sorted on status
             regex="$@"
             [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: grep : $@"
-            egrep "$@" "$TSV_FILE" | cut -c6-8,63-  |  sed 's/^OPE/_ /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g' | sort -k1,1
+            egrep "$@" "$TSV_FILE" | cut -c6-8,63-  |  sed 's/^OPE/- /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g' | sort -k1,1
             ;;
 
-            "tag" ) # COMMAND: adds a tag at end of title, with '@' prefixed, helps in searching.
+"tag" ) # COMMAND: adds a tag at end of title, with '@' prefixed, helps in searching.
             tag="@$1"
             errmsg="usage: $TODO_SH $action TAG ITEM#"
             shift
