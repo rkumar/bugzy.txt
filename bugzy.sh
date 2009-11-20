@@ -1880,10 +1880,14 @@ done # while true
     
     ;;
     "ope" | "sta" | "clo" | "can" | "sto" | \
-    "open" | "started" | "closed" | "canceled" | "stopped" ) # COMMAND
+    "open" | "started" | "closed" | "canceled" | "stopped" ) # COMMAND change status of given item/s
     [ ${#action} -eq 3 ] && action=$(echo "$action" | sed 's/can/canceled/;s/clo/closed/;s/sto/stopped/;s/ope/open/')
-        item=$1
+    for item in "$@"
+    do
+        #item=$1
+        echo "$item"
         change_status $item "$action"
+    done
         ;;
 
     "pri" ) # COMMAND
@@ -2212,8 +2216,13 @@ note: PRIORITY must be anywhere from A to Z."
                 echo "nothing to archive";
             fi
             ;;
-            "quick" | "q" )
+            "quick" | "q" ) # COMMAND a quick report showing status and title sorted on status
             cut -c6-8,63- "$TSV_FILE" | sed 's/^OPE/_ /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g' | sort -k1,1
+            ;;
+            "grep" ) # COMMAND uses egrep to run a quick report showing status and title sorted on status
+            regex="$@"
+            [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: grep : $@"
+            egrep "$@" "$TSV_FILE" | cut -c6-8,63-  |  sed 's/^OPE/_ /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g' | sort -k1,1
             ;;
 
 
