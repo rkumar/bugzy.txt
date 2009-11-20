@@ -648,6 +648,7 @@ get_title()
     local mtitle=$(grep -m 1 "^title:" $file | cut -d':' -f2-)
     echo "$mtitle"
 }
+# returns title for an item/task NEW TSV file
 tsv_get_title()
 {
     item=${1:-$item}
@@ -696,7 +697,8 @@ change_status()
         tsv_set_column_value $item $reply $newcode
         echo "$item is now $input ($newcode)"
         log_changes $reply "$oldvalue" $input $file
-        mtitle=`get_title $item`
+        #mtitle=`get_title $item`
+        mtitle=`tsv_get_title $item`
         [ ! -z "$EMAIL_TO" ] && cat "$file" | mail -s "[$var] $mtitle" $EMAIL_TO
         show_diffs 
 }
@@ -1534,7 +1536,7 @@ EndUsage
     common_validation $1 $errmsg
 
     # TODO only confirm if not forced
-    grep -m 1 "^title" $file
+    #grep -m 1 "^title" $file
     #mtitle=`get_title $item`  # OLD
     #body=$( cat $file )  # OLD
     mtitle=`tsv_get_title $item`
@@ -1922,13 +1924,11 @@ note: PRIORITY must be anywhere from A to Z."
         "depri") # COMMAND
         errmsg="usage: $TODO_SH $action ITEM#"
         common_validation $1 $errmsg 
-        get_title
         sed  -i.bak "s/^\(title: \[.*\]\) (.)/\1/" $file
         # tsv stuff
         oldvalue=$( tsv_get_column_value $item "title" )
         newvalue=$( echo "$oldvalue" | sed  -e "s/^\(\[.*\]\) (.)/\1/" )
         tsv_set_column_value $item "title" "$newvalue"
-        get_title
         show_diffs 
         cleanup
         ;;
