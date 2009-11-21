@@ -19,6 +19,7 @@ TODO_SH=$PROGNAME
 export PROGNAME
 Date="2009-11-16"
 DATE_FORMAT='+%Y-%m-%d %H:%M'
+DUE_DATE_FORMAT='+%Y-%m-%d'
 arg0=$(basename "$0")
 
 TSV_FILE="data.tsv"
@@ -620,7 +621,7 @@ convert_due_date()
    if [ ${input:0:1} == '+' ];
    then
        input=${input:1}
-       result=$(date --date "$input" "$DATE_FORMAT")
+       result=$(date --date "$input" "$DUE_DATE_FORMAT")
    else
        result=$input
    fi
@@ -1392,7 +1393,7 @@ REG_ID="^...."
 REG_STATUS="..."
 REG_SEVERITY="..."
 REG_TYPE="..."
-REG_DUE_DATE=".{16}"
+REG_DUE_DATE=".{10}"
 REG_DATE_CREATED=".{16}"
 REG_ASSIGNED_TO=".{10}"
 
@@ -1485,7 +1486,7 @@ case $action in
         fi
     }
     [  -z "$i_due_date" ] && i_due_date=" "
-    i_due_date=$( printf "%-16s" "$i_due_date" )
+    i_due_date=$( printf "%-10s" "$i_due_date" )
     prompts=
     [ "$PROMPT_ASSIGNED_TO" == "yes" ] && {
         [ ! -z "$ASSIGNED_TO" ] && prompts=" [default is $ASSIGNED_TO]"
@@ -1852,7 +1853,7 @@ done # while true
     severity="..."
     id=".{4}"
     date_created=".{16}"
-    due_date=".{16}"
+    due_date=".{10}"
     assigned_to=".{10}"
     title="."
 
