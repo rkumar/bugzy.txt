@@ -2017,7 +2017,12 @@ note: PRIORITY must be anywhere from A to Z."
 
 "show" ) # COMMAND
         errmsg="usage: $TODO_SH show ITEM#"
-        common_validation $1 $errmsg
+        item=$1
+        [ -z "$1" ] && {
+            item=$( sed '$!d' "$TSV_FILE" | cut -f1 | sed 's/ *//g' )
+            echo "No item passed. Showing last one ($item)"
+        }
+        common_validation $item $errmsg
 
         # read up the headers into an array
         declare -a headers
@@ -2305,7 +2310,10 @@ note: PRIORITY must be anywhere from A to Z."
 "grep" ) # COMMAND uses egrep to run a quick report showing status and title sorted on status
             regex="$@"
             [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: grep : $@"
-            egrep "$@" "$TSV_FILE" | cut -c6-8,$TSV_TITLE_OFFSET1-  |  sed 's/^OPE/- /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g' | sort -k1,1
+            egrep "$@" "$TSV_FILE" | cut -f1,2,8  | \
+            sed "s/^\(....\)${DELIM}\(...\)/\2\1/"| \
+            sed 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g' | \
+            sort -k1,1
             ;;
 
 "tag" ) # COMMAND: adds a tag at end of title, with '@' prefixed, helps in searching.
@@ -2327,7 +2335,7 @@ note: PRIORITY must be anywhere from A to Z."
         tsv_get_title $item
         echo "Enter a fix or resolution for $item"
         add_fix 
-        cleanup;;
+        cleanup
 
         echo "Updated fix $item. To view, use: show $item"
         ;;
