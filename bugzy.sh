@@ -1423,9 +1423,9 @@ REG_ID="^...."
 REG_STATUS="..."
 REG_SEVERITY="..."
 REG_TYPE="..."
-REG_DUE_DATE=".{10}"
-REG_DATE_CREATED=".{16}"
-REG_ASSIGNED_TO=".{10}"
+REG_DUE_DATE=".\{10\}"
+REG_DATE_CREATED=".\{16\}"
+REG_ASSIGNED_TO=".\{10\}"
 
 
 [ -r "$PROG_CFG_FILE" ] || die "Fatal error: Cannot read configuration file $PROG_CFG_FILE"
@@ -1837,7 +1837,7 @@ done # while true
     [ $count -eq 1 ] || die "$errmsg"
     #tasks=$(grep -l -m 1 $FLAG "^status: *$status" $FILELIST)
     formatted_tsv_headers 
-    grep -P $FLAG "^....\t$status\t" "$TSV_FILE" \
+    grep  $FLAG "^....${DELIM}$status${DELIM}" "$TSV_FILE" \
         | eval ${TSV_SORT_COMMAND}           \
         | pretty_print
     ;;
@@ -1887,13 +1887,14 @@ done # while true
     #[ -z "$value" ] && die "$errmsg"
     #key=$( printf "%s\n" "$key" | tr 'A-Z' 'a-z' )
 
+    # if you use grep -P then don't escape {
     status="..."
     type="..."
     severity="..."
-    id=".{4}"
-    date_created=".{16}"
-    due_date=".{10}"
-    assigned_to=".{10}"
+    id=".\{4\}"
+    date_created=".\{16\}"
+    due_date=".\{10\}"
+    assigned_to=".\{10\}"
     title="."
 
     #echo "selm received: $#,  $*"
@@ -1918,12 +1919,14 @@ done # while true
             * ) full_regex=1;;
         esac
     done
-    regex="^${id}\t${status}\t${severity}\t${type}\t"
+    regex="^${id}${DELIM}${status}${DELIM}${severity}${DELIM}${type}${DELIM}"
     #id  status  severity        type    assigned_to     date_created    due_date        title
-    [ $full_regex -gt 0 ] && regex+="${assigned_to}\t${date_created}\t${due_date}\t${title}"
-    echo "regex:$regex"
+    [ $full_regex -gt 0 ] && regex+="${assigned_to}${DELIM}${date_created}${DELIM}${due_date}${DELIM}${title}"
+    echo "regex:($regex)"
     tsv_headers
-    grep -P "$regex" "$TSV_FILE"
+    # -P is GNU only, wont work everywhere, UGH
+    #grep -P "$regex" "$TSV_FILE"
+    grep "$regex" "$TSV_FILE"
     
     ;;
 
@@ -1956,14 +1959,14 @@ done # while true
     ctr=1
     for ii in $words
     do
-        regex="${REG_ID}\t${REG_TYPE}\t$ii"
+        regex="${REG_ID}${DELIM}${REG_TYPE}${DELIM}$ii"
         case $ctr in
             1)  USE_PRI="$PRI_A";;
             2)  USE_PRI="$PRI_B";;
             3)  USE_PRI="$PRI_C";;
             *)  USE_PRI="$PRI_X";;
         esac
-        grep -P "$regex" "$TSV_FILE" | color_line 
+        grep "$regex" "$TSV_FILE" | color_line 
         let ctr+=1
     done
 
@@ -2296,8 +2299,8 @@ note: PRIORITY must be anywhere from A to Z."
             ARCHIVE_FILE="archive.txt"
             #regex="${REG_ID}${DELIM}(CLO|CAN)"
             regex="${REG_ID}${DELIM}C[LA][NO]"
-            count=$( grep -c -P  "$regex" "$TSV_FILE" )
-            toarch=$( grep  -P "$regex" "$TSV_FILE" | cut -f1 | sed 's/^ //g' )
+            count=$( grep -c   "$regex" "$TSV_FILE" )
+            toarch=$( grep   "$regex" "$TSV_FILE" | cut -f1 | sed 's/^ //g' )
             if [[ $count > 0 ]]; 
             then  
                 sedfound=$( sed "/$regex/!d" "$TSV_FILE" | grep -c . )
@@ -2305,7 +2308,7 @@ note: PRIORITY must be anywhere from A to Z."
                     echo "Your regex is not working on sed. $sedfound items instead of $count"
                     exit 1
                 fi
-                grep  -P "$regex" "$TSV_FILE" >> "$ARCHIVE_FILE"
+                grep   "$regex" "$TSV_FILE" >> "$ARCHIVE_FILE"
                 # DARN sed wont take perl expressions
                 sed -i.bak "/$regex/d" "$TSV_FILE"
                 echo "$count row/s archived to $ARCHIVE_FILE";
