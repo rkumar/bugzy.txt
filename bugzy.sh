@@ -2325,6 +2325,16 @@ note: PRIORITY must be anywhere from A to Z."
         color_by_priority
             ;;
 
+"oldest" ) # COMMAND a quick report showing  oldest <n> items added
+        count=${1:-10}
+        egrep "${DELIM}OPE${DELIM}|${DELIM}STA${DELIM}" "$TSV_FILE" | \
+        head -${count}  | \
+        cut -f1,2,6,8  | \
+        sed "s/^\(....\)${DELIM}\(...\)/\2\1/"| \
+        sed 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g' | \
+        color_by_priority
+            ;;
+
 "tag" ) # COMMAND: adds a tag at end of title, with '@' prefixed, helps in searching.
             tag="@$1"
             errmsg="usage: $TODO_SH $action TAG ITEM#"
