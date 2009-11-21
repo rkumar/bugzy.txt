@@ -34,10 +34,12 @@ PRINT_DETAILS=0
 TSV_OUTPUT_DELIMITER=" | "
 # input delimiter or IFS
 export DELIM=$'\t'
-export TSV_TITLE_OFFSET1=57 # with id
-export TSV_TITLE_OFFSET2=63 # without the id
-DESCRIPTION_EDITOR=cat
+export TSV_TITLE_OFFSET1=57 # with id - DONT USE
+## This is the field offset for title if using cut -f
+export TSV_TITLE_COLUMN=8
+#export TSV_TITLE_OFFSET2=63 # without the id
 
+TODOTXT_FORCE=0
 #ext=${1:-"default value"}
 #today=$(date +"%Y-%m-%d-%H%M")
 
@@ -673,7 +675,7 @@ get_title()
 tsv_get_title()
 {
     item=${1:-$item}
-    local mtitle=`tsv_get_rowdata $item | cut -c$TSV_TITLE_OFFSET1- `
+    local mtitle=`tsv_get_rowdata $item | cut -f$TSV_TITLE_COLUMN `
     echo "$mtitle"
 }
 ## returns value for id and key
@@ -1018,9 +1020,10 @@ hash_data(){
     done
     IFS=$OLDIFS
 }
-## returns title column, all rows
+## returns title column, all rows - unused ?
 tsv_titles(){
-        cut -c$TSV_TITLE_OFFSET1- "$TSV_FILE" 
+        #cut -c$TSV_TITLE_OFFSET1- "$TSV_FILE" 
+        cut -c$TSV_TITLE_COLUMN "$TSV_FILE" 
 }
 ## print titles of CSV file
 tsv_headers(){
@@ -1149,8 +1152,10 @@ tsv_delete_item(){
     [ ! -d "$DELETED_DIR" ] && mkdir "$DELETED_DIR";
     echo "$row" >> "$TSV_FILE_DELETED"
     sed -i.bak "${lineno}d" "$TSV_FILE"
+    [ $? -eq 0 ] && echo "Deleted $item."
     #moved back here on 2009-11-19 12:34 since update does not delete and should not
     tsv_delete_other_files $item
+    [ $? -eq 0 ] && echo "Deleted other files for $item."
 }
     
 tsv_delete_other_files(){
@@ -1170,6 +1175,7 @@ tsv_delete_other_files(){
     # TODO delete files from here
     grep "^$item:" "$EXTRA_DATA_FILE" >> deleted.extra.txt
     sed -i.bak "/^$item:/d" "$EXTRA_DATA_FILE"
+    return $?
 }
 ## updates tsv row with data for given
 # item, columnname, value
@@ -1594,22 +1600,29 @@ EndUsage
     errmsg="usage: $TODO_SH $action task#"
     item=$1
     common_validation $1 $errmsg
-
-    # todo only confirm if not forced
-    #grep -m 1 "^title" $file
-    #mtitle=`get_title $item`  # OLD
-    #body=$( cat $file )  # OLD
     mtitle=`tsv_get_title $item`
-    body=`PRI_A=$NONE;DEFAULT=$NONE;print_item $item`
-    [ ! -d "$DELETED_DIR" ] && mkdir "$DELETED_DIR";
-    #mv $file "$DELETED_DIR/`basename $file`.del" || mv $file $file.del
-    mv $file $file.del
-    mv $file.del "$DELETED_DIR/"
-    # tsv stuff
-    tsv_delete_item $item
-    [ ! -z "$EMAIL_TO" ] && echo -e "$body" | mail -s "[DEL] $mtitle" $EMAIL_TO
-    
-       cleanup;;
+            if  [ $TODOTXT_FORCE = 0 ]; then
+                echo "Delete '$mtitle'?  (y/n)"
+                read ANSWER
+            else
+                ANSWER="y"
+            fi
+            if [ "$ANSWER" = "y" ]; then
+                body=`PRI_A=$NONE;DEFAULT=$NONE;print_item $item`
+                [ ! -d "$DELETED_DIR" ] && mkdir "$DELETED_DIR";
+                #mv $file "$DELETED_DIR/`basename $file`.del" || mv $file $file.del
+                mv $file $file.del
+                mv $file.del "$DELETED_DIR/"
+                # tsv stuff
+                tsv_delete_item $item
+                [ ! -z "$EMAIL_TO" ] && echo -e "$body" | mail -s "[DEL] $mtitle" $EMAIL_TO
+                [ $VERBOSE_FLAG -gt 0 ] && echo "Bugzy: '$mtitle' deleted."
+                cleanup
+            else
+                echo "Bugzy: No tasks were deleted."
+            fi
+
+       ;;
 
 "edit" | "ed") # COMMAND
     errmsg="usage: $TODO_SH $action task#"
