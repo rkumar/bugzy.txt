@@ -34,6 +34,8 @@ PRINT_DETAILS=0
 TSV_OUTPUT_DELIMITER=" | "
 # input delimiter or IFS
 DELIM=$'\t'
+TSV_TITLE_OFFSET1=57 # with id
+TSV_TITLE_OFFSET2=63 # without the id
 
 #ext=${1:-"default value"}
 #today=$(date +"%Y-%m-%d-%H%M")
@@ -668,7 +670,7 @@ get_title()
 tsv_get_title()
 {
     item=${1:-$item}
-    local mtitle=`tsv_get_rowdata $item | cut -c63- `
+    local mtitle=`tsv_get_rowdata $item | cut -c$TSV_TITLE_OFFSET1- `
     echo "$mtitle"
 }
 ## returns value for id and key
@@ -997,7 +999,7 @@ hash_data(){
 }
 ## returns title column, all rows
 tsv_titles(){
-        cut -c63- "$TSV_FILE" 
+        cut -c$TSV_TITLE_OFFSET1- "$TSV_FILE" 
 }
 ## print titles of CSV file
 tsv_headers(){
@@ -1272,6 +1274,9 @@ calc_overdue()
     #echo "$days days $hours hour(s) "
 }
 
+# removing the pesky id in titles
+# FIXME, when we remove it, then remove this line, but how will we colorize ?
+# \+ does not work in my sed, but works in gsed
 pretty_print(){
     tomorrow=`date --date="tomorrow" '+%Y-%m-%d'`
     dayafter=`date --date="+2 days" '+%Y-%m-%d'`
@@ -1285,6 +1290,7 @@ pretty_print(){
             -e  "/^....${DELIM}OPE${DELIM}/s/^ /_/g" \
             -e  "/${DELIM}${tomorrow}${DELIM}/s/\(\[#.*\)/${PRI_A}\1${DEFAULT}/g" \
             -e  "/${DELIM}${dayafter}${DELIM}/s/\(\[#.*\)/${PRI_B}\1${DEFAULT}/g" \
+            -e  "s/\[#[0-9]\{1,\}\] //g" \
             -e  "s/${tomorrow}/${PRI_A}${tomorrow}${DEFAULT}/g" \
             -e  "s/${dayafter}/${PRI_B}${dayafter}${DEFAULT}/g" \
             -e "s/$DELIM/$TSV_OUTPUT_DELIMITER/g" 
@@ -2265,13 +2271,13 @@ note: PRIORITY must be anywhere from A to Z."
 
             # put symbold in global vars so consistent TODO, color this based on priority
 "quick" | "q" ) # COMMAND a quick report showing status and title sorted on status
-            cut -c6-8,63- "$TSV_FILE" | sed 's/^OPE/- /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g;s/CAN/x /g' | sort -k1,1 -k3,3 | color_by_priority
+            cut -c6-8,$TSV_TITLE_OFFSET1- "$TSV_FILE" | sed 's/^OPE/- /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g;s/CAN/x /g' | sort -k1,1 -k3,3 | color_by_priority
             ;;
 
 "grep" ) # COMMAND uses egrep to run a quick report showing status and title sorted on status
             regex="$@"
             [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: grep : $@"
-            egrep "$@" "$TSV_FILE" | cut -c6-8,63-  |  sed 's/^OPE/- /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g' | sort -k1,1
+            egrep "$@" "$TSV_FILE" | cut -c6-8,$TSV_TITLE_OFFSET1-  |  sed 's/^OPE/- /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g' | sort -k1,1
             ;;
 
 "tag" ) # COMMAND: adds a tag at end of title, with '@' prefixed, helps in searching.
