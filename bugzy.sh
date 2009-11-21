@@ -2294,12 +2294,19 @@ note: PRIORITY must be anywhere from A to Z."
 
 "archive" | "ar" ) # COMMAND: move closed bugs, what about canceled ? XXX
             ARCHIVE_FILE="archive.txt"
-            regex="${REG_ID}${DELIM}CLO"
-            count=$( grep -c -P "$regex" "$TSV_FILE" )
-            toarch=$( grep -P "$regex" "$TSV_FILE" | cut -f1 | sed 's/^ //g' )
+            #regex="${REG_ID}${DELIM}(CLO|CAN)"
+            regex="${REG_ID}${DELIM}C[LA][NO]"
+            count=$( grep -c -P  "$regex" "$TSV_FILE" )
+            toarch=$( grep  -P "$regex" "$TSV_FILE" | cut -f1 | sed 's/^ //g' )
             if [[ $count > 0 ]]; 
             then  
-                grep -P "$regex" "$TSV_FILE" >> "$ARCHIVE_FILE"
+                sedfound=$( sed "/$regex/!d" "$TSV_FILE" | grep -c . )
+                if [ $sedfound -lt $count ]; then
+                    echo "Your regex is not working on sed. $sedfound items instead of $count"
+                    exit 1
+                fi
+                grep  -P "$regex" "$TSV_FILE" >> "$ARCHIVE_FILE"
+                # DARN sed wont take perl expressions
                 sed -i.bak "/$regex/d" "$TSV_FILE"
                 echo "$count row/s archived to $ARCHIVE_FILE";
                 echo "cleaning other/older files: $toarch"
@@ -2308,8 +2315,8 @@ note: PRIORITY must be anywhere from A to Z."
                 do
                     echo "$f"
                     [ -f "$f.txt" ] && mv "$f.txt" archived/
-                    mv $f.*.txt archived/
-                    rm $f.*bak
+                    mv $f.*.txt archived/  > /dev/null 2>&1
+                    rm $f.*bak  > /dev/null 2>&1
                 done
             else 
                 echo "nothing to archive";
