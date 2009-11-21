@@ -33,9 +33,10 @@ PRETTY_PRINT=1
 PRINT_DETAILS=0
 TSV_OUTPUT_DELIMITER=" | "
 # input delimiter or IFS
-DELIM=$'\t'
-TSV_TITLE_OFFSET1=57 # with id
-TSV_TITLE_OFFSET2=63 # without the id
+export DELIM=$'\t'
+export TSV_TITLE_OFFSET1=57 # with id
+export TSV_TITLE_OFFSET2=63 # without the id
+DESCRIPTION_EDITOR=cat
 
 #ext=${1:-"default value"}
 #today=$(date +"%Y-%m-%d-%H%M")
@@ -276,6 +277,8 @@ hash_set "VALUES" "type" "bug feature enhancement task"
 hash_set "TSVVALUES" "status" "OPE STA CLO STO CAN"
 hash_set "TSVVALUES" "severity" "NOR CRI SER"
 hash_set "TSVVALUES" "type" "BUG FEA ENH TAS"
+
+# edits temporary file, remember to cleanup after
 edit_tmpfile()
 {
             mtime=`stat -c %Y $TMP_FILE`
@@ -913,6 +916,24 @@ x
         echo "$item:com:$text" >> "$EXTRA_DATA_FILE"
     }
 }
+add_fix(){
+    item=$1
+    reply="fix"
+    description=$( get_extra_data $item $reply )
+    oldvalue=$description
+    lines=$(echo "$description"  | wc -l)
+    [ -z "$description" ] && {
+        description=$(echo "");lines=0;
+    }
+    echo "$description" > $TMP_FILE
+    edit_tmpfile
+    [ $RESULT -gt 0 ] && {
+        text=$(cat $TMP_FILE)
+        update_extra_data $item $reply "$text"
+        log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
+        let modified+=1
+    }
+}
 ## returns field value given a field
 ## please pipe data of a file to this.
 get_value(){
@@ -1153,7 +1174,6 @@ tsv_delete_other_files(){
 ## updates tsv row with data for given
 # item, columnname, value
 # -1 on errors
-# TODO use ex change and not delete and insert.
 tsv_set_column_value(){
     item=$1
     #lineno=`tsv_lineno $item`
@@ -1274,8 +1294,7 @@ calc_overdue()
     #echo "$days days $hours hour(s) "
 }
 
-# removing the pesky id in titles
-# FIXME, when we remove it, then remove this line, but how will we colorize ?
+# removed the pesky id in titles, to colorize titles i am colorizing data after last tab
 # \+ does not work in my sed, but works in gsed
 pretty_print(){
     tomorrow=`date --date="tomorrow" '+%Y-%m-%d'`
@@ -1288,9 +1307,8 @@ pretty_print(){
             -e  "/^....${DELIM}CLO${DELIM}/s/^ /x/g" \
             -e  "/^....${DELIM}CAN${DELIM}/s/^ /x/g" \
             -e  "/^....${DELIM}OPE${DELIM}/s/^ /_/g" \
-            -e  "/${DELIM}${tomorrow}${DELIM}/s/\(\[#.*\)/${PRI_A}\1${DEFAULT}/g" \
-            -e  "/${DELIM}${dayafter}${DELIM}/s/\(\[#.*\)/${PRI_B}\1${DEFAULT}/g" \
-            -e  "s/\[#[0-9]\{1,\}\] //g" \
+            -e  "/${DELIM}${tomorrow}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_A}\2${DEFAULT}/g" \
+            -e  "/${DELIM}${dayafter}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_B}\2${DEFAULT}/g" \
             -e  "s/${tomorrow}/${PRI_A}${tomorrow}${DEFAULT}/g" \
             -e  "s/${dayafter}/${PRI_B}${dayafter}${DEFAULT}/g" \
             -e "s/$DELIM/$TSV_OUTPUT_DELIMITER/g" 
@@ -1458,8 +1476,9 @@ case $action in
     fi
     [ -z "$atitle" ] && die "Title required for bug"
     [ "$PROMPT_DESC" == "yes" ] && {
-        echo -n "Enter a description: "
-        read i_desc
+        echo -n "Enter a description (^D to exit): "
+        #read i_desc
+        i_desc=`cat`
     }
     i_type=${DEFAULT_TYPE:-"bug"}
     i_severity=${DEFAULT_SEVERITY:-"normal"}
@@ -1508,7 +1527,7 @@ case $action in
     #serialid=`incr_id`
     serialid=`get_next_id`
     task="[$short_type #$serialid]"
-    todo="$task $atitle"
+    todo="$task $atitle" # now used only in mail subject
     tabtitle="[#$serialid] $atitle"
     [ -d "$ISSUES_DIR" ] || mkdir "$ISSUES_DIR"
     editfile=$ISSUES_DIR/${serialid}.txt
@@ -1524,7 +1543,7 @@ case $action in
 
       ## CAUTION: programs that use this require one space aftr colon, don't reformat this
     sed -e 's/^    //' <<EndUsage >"$editfile"
-    title: $todo
+    title: $atitle
     id: $serialid
     description:
                 $i_desc
@@ -1550,7 +1569,7 @@ EndUsage
       tabid=$( printf "%4s" "$serialid" )
       
       #tabfields="$tabstat${del}$tabseve${del}$tabtype${del}$serialid${del}$now${del}$ASSIGNED_TO${del}$i_due_date${del}$todo"
-      tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$now${del}$i_due_date${del}$tabtitle"
+      tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$now${del}$i_due_date${del}$atitle"
       echo "$tabfields" >> "$TSV_FILE"
       [ ! -z "$i_desc" ] && echo "$i_desc" > $serialid.description.txt
       # combined file approach
@@ -1570,12 +1589,13 @@ EndUsage
     echo "Created $serialid"
        cleanup;;
 
+       # TODO allow multiple items ?
 "del" | "rm") # COMMAND: delete an item
     errmsg="usage: $TODO_SH $action task#"
     item=$1
     common_validation $1 $errmsg
 
-    # TODO only confirm if not forced
+    # todo only confirm if not forced
     #grep -m 1 "^title" $file
     #mtitle=`get_title $item`  # OLD
     #body=$( cat $file )  # OLD
@@ -1946,6 +1966,7 @@ done # while true
     done
         ;;
 
+        # TODO allow multiple items ?
 "pri" ) # COMMAND: give priority to a task, appears in title and colored and sorted in some reports
 
     errmsg="usage: $TODO_SH $action ITEM# PRIORITY
@@ -2138,7 +2159,7 @@ note: PRIORITY must be anywhere from A to Z."
         done
 
         ;;
-"viewlog" | "viewcomment" ) # COMMAND
+"viewlog" | "viewcomment" ) # COMMAND: view comments for an item
         errmsg="usage: $TODO_SH $action ITEM#"
         common_validation $1 $errmsg 
         field=${action:4}
@@ -2147,7 +2168,9 @@ note: PRIORITY must be anywhere from A to Z."
         echo "$data"
 
         ;;
-"comment" | "addcomment" ) # COMMAND
+
+        # user may want to add one comment to many items
+"comment" | "addcomment" ) # COMMAND: to add a comment to an item
         errmsg="usage: $TODO_SH $action ITEM#"
         common_validation $1 $errmsg 
         cp $file $file.bak
@@ -2270,8 +2293,13 @@ note: PRIORITY must be anywhere from A to Z."
             ;;
 
             # put symbold in global vars so consistent TODO, color this based on priority
+            # now that we've removed id from title, i've had to do some jugglery to switch cols
 "quick" | "q" ) # COMMAND a quick report showing status and title sorted on status
-            cut -c6-8,$TSV_TITLE_OFFSET1- "$TSV_FILE" | sed 's/^OPE/- /g;s/^CLO/x /g;s/^STA/@ /g;s/STO/$ /g;s/CAN/x /g' | sort -k1,1 -k3,3 | color_by_priority
+        cut -f1,2,8 "$TSV_FILE" | \
+        sed "s/^\(....\)${DELIM}\(...\)/\2\1/"| \
+        sed 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g' | \
+        sort -k1,1 -k3,3 | \
+        color_by_priority
             ;;
 
 "grep" ) # COMMAND uses egrep to run a quick report showing status and title sorted on status
@@ -2292,6 +2320,17 @@ note: PRIORITY must be anywhere from A to Z."
             done
             ;;
 
+            # what if one fix to be attached to several bugs ?
+"fix" | "addfix" )
+        errmsg="usage: $TODO_SH $action ITEM#"
+        common_validation $1 $errmsg 
+        tsv_get_title $item
+        echo "Enter a fix or resolution for $item"
+        add_fix 
+        cleanup;;
+
+        echo "Updated fix $item. To view, use: show $item"
+        ;;
 
 * )
     usage
