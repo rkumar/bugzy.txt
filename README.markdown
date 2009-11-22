@@ -1,18 +1,22 @@
 BUGZY.TXT Command Line Bug Tracker
 ==================================
 
-A simple (and not yet extensible) shell script for managing bugs/features/enhancements and tasks.
+A simple (and not yet extensible) shell script for managing
+bugs/features/enhancements and tasks.
 
-Bugs have a unique persistent serial number. Each bug is written to a separate file with various fields
-in the email header like format with title, description, severity, date_created, type, fix, comments,
-log, status, etc.
+Bugs have a unique persistent serial number. I have moved from a single
+issue per file (key: value) format, to a tab separated single file
+format. The earlier file format is still created and updated till I
+decide whether to knock it off altogether.
 
 Mails are sent using the 'mail' command if specified.
 
-Currently, it is very new, help is not documented, just wait a week or 3 before using.
+Currently, it is very new, help is not documented, just wait a week or 3
+before using.
 
-I am now testing out a tab delimited format which seems to give far better query and search 
-performance than the earlier key value format which was hard to multiple search on.
+I have moved to a tab separated format from key:value flat file.
+however, the old files are still created i have not yet removed them,
+since someone may like it that way.
 
 Downloads
 ---------
@@ -42,7 +46,12 @@ The bug files are created in a directory ".todos" inside TODO_DIR.
 ### Usage
 
 Current operations include add, mod, edit (edit the file itself), delete, list, list by severity,
-select (based on a key), show.
+show, tag, quick, grep.
+
+When adding an issue, entry of fields can be reduced by adding a default
+in the config file, and setting PROMPT to NO. When entering due_date, a
+value such as "+3 days" or "tomorrow" may be entered (provided your
+version of `date` can do the conversion.
 
 Actions to directly change status are open, started, closed, canceled, stopped or the first 3 letter of each.
 
@@ -57,15 +66,6 @@ Actions to directly change status are open, started, closed, canceled, stopped o
 sorted above. "depri" removes priority.
 
 "liststat" lists tasks for a given status (|open|closed|started|stopped|canceled|).
-
-"longlist" (or "ll" field1 field2 ... (lists the given fields for all tasks)
-
-Bugs displayed may be restricted to some numbers using the "-i" flag.
-e.g.
-
-    b -i '106 107 109 110}' longlist
-    b -i '{106..118}' ll
-    b -v -i '!(106)' ll
 
 The above example relies on shell expansion, if supported by your shell.
 
@@ -82,6 +82,8 @@ The above example relies on shell expansion, if supported by your shell.
 
 "addcomment" item#    # add a comment
 
+"fix" item#    # add a fix or resolution
+
 
 TO ADD MORE HERE.
 
@@ -89,17 +91,24 @@ You may also alias bugzy to "b" in ~/.bashrc or equivalent.
 
     > alias b='bugzy -d ~/bugzy.cfg'  
     > b add "Module aaa crashes on startup"  
+    > b show
     > b list  
     > b mod 1  
     > b start 1  
-    > b cancel 1  
     > b close 1  
     > b show  
     > b add "Module bbb crashes on startup"  
     > b pri 2 A  
     > b  
+
     > b depri 2  
-    > b  
+    > b q
+    > b status
+    > b grep crash
+    > b tag URG 1 2
+    > b grep @URG
+    > b liststat OPE
+    > b newest 5
 
  
 
@@ -109,3 +118,4 @@ Others
 - Uses the excellent [todo.txt shell script](http://github.com/ginatrapani/todo.txt-cli) as a base.
 
 - Original anaemic release by rkumar on 2009-11-08.
+/* vim: set tw=72: */
