@@ -52,7 +52,49 @@ usage()
 EndUsage
     exit 1
 }
-help() # COMMAND
+shorthelp()
+{
+    sed -e 's/^    //' <<EndHelp
+      Usage: $oneline_usage
+
+      Operations:
+        add|a "Fix calculation in +project @context"
+        archive|ar
+        comment|addcomment NUMBER
+        #command [ACTIONS] TODO
+        del|rm NUMBER 
+        dp|depri NUMBER
+        fix|addfix
+        help
+        modify|mod NUMBER
+        pri|p NUMBER PRIORITY
+        tag TAG ITEM1 ITEM1 ... ITEMn
+
+        open|ope     NUMBER
+        started|sta  NUMBER
+        closed|clo   NUMBER
+        canceled|can NUMBER
+        stopped|sto  NUMBER
+     
+      Listings:
+        list|ls [TERM...]
+        grep REGEX
+        lbs
+        oldest [COUNT]
+        newest [COUNT]
+        quick|q
+        show [NUMBER]
+        status
+        upcoming|upc 
+        viewlog  NUMBER
+        viewcomment NUMBER
+
+
+      See "help" for more details.
+EndHelp
+    exit 0
+}
+help() # COMMAND: shows help
 {
     sed -e 's/^    //' <<EndHelp
       Usage: $oneline_usage
@@ -60,24 +102,37 @@ help() # COMMAND
       Actions:
         add "THING I NEED TO DO +project @context"
         a "THING I NEED TO DO +project @context"
-          Adds THING I NEED TO DO to your todo.txt file on its own line.
+          Adds THING I NEED TO DO to your data.tsv file on its own line.
           Project and context notation optional.
           Quotes optional.
+
+        archive 
+        ar 
+          Moves closed and canceled items to archive.txt
+
+        comment NUMBER
+        addcomment NUMBER
+          to add a comment to an item
 
         modify NUMBER
         mod NUMBER
           allows user to modify various fields of a bug
 
-        edit NUMBER
-          Opens bug file in editor for editing. May be disallowed
-
         del NUMBER [TERM]
         rm NUMBER [TERM]
-          Deletes the item 
+          Deletes the item/bug/task
 
         depri NUMBER
         dp NUMBER
           Deprioritizes (removes the priority) from the item
+
+        fix    NUMBER
+        addfix NUMBER
+          add a fix / resolution for given item
+
+        grep REGEX
+          uses egrep to run a regex search showing status and title sorted on status
+          This searches the entire record using egrep and prints matches
 
         help
           Display this help message.
@@ -88,9 +143,11 @@ help() # COMMAND
           numbers.  If no TERM specified, lists all items.
           The -l option results in descriptions, comments and fix being printed also.
 
-        longlist [Fields ...]
-        ll type id severity status title
-          Lists given fields from all files
+        newest N
+            a quick report showing  newest <n> items added
+
+        oldest N
+            a quick report showing  oldest <n> items added
 
         listpri [PRIORITY]   TODO
         lsp [PRIORITY]
@@ -107,36 +164,40 @@ help() # COMMAND
           prioritized, replaces current priority with new PRIORITY.
           PRIORITY must be an uppercase letter between A and Z.
 
-       show NUMBER
-          Displays the bug file
+        show NUMBER
+          shows an item, defaults to last
 
-       lbs
+        lbs
           Lists bugs by severity.
 
-       select key value
-       sel status started
-       sel severity critical
-          lists titles for a key and value
-          keys are  status date_created severity type
-
-       selectm "type: bug" "status: open" ...
-       selm "type=bug" "status=(open|started)" "severity=critical"
+        selectm "type: BUG" "status: OPE" ...
+        selm "type=bug" "status=(open|started)" "severity=critical"
           A multiple criteria search.
 
-       grep
-          takes a regex and searches the entire record using egrep and prints matches
-
-       quick
-       q
+        quick
+        q
           Prints a list of titles with status on left.
 
-       tag TAG item1 item1 ...
+        tag TAG item1 item1 ...
           Appends a tag to multiple items, prefixed with @
 
-       print item#
+        print NUMBER
           Prints details of given item
 
+        open     NUMBER
+        started  NUMBER
+        closed   NUMBER
+        canceled NUMBER
+        stopped  NUMBER
+          change status of given item/s. May also use first 3 characters
 
+        upcoming
+        upc 
+          shows upcoming tasks
+          
+        viewlog  NUMBER
+        viewcomment NUMBER
+           view comments for an item
 
 EndHelp
     exit 0
@@ -1382,7 +1443,7 @@ Dflag=
 while getopts lhpvVf:o:D:d:i: flag
 do
     case "$flag" in
-        (h) help; exit 0;;
+        (h) shorthelp;;
         (V) echo "$arg0: version @REVISION@ ($Date) Author: rkumar"; exit 0;;
         (v) 
         : $(( VERBOSE_FLAG++ ))
@@ -1808,7 +1869,7 @@ done # while true
        echo "left is $*"
        cleanup;;
 
-"list" | "ls") # COMMAND: list, uses old flat files (now new), use -l for details
+"list" | "ls") # COMMAND: list use -l for details
        #PRINT_DETAILS=0
        _list "$@"
        cleanup;;
@@ -1977,7 +2038,7 @@ done # while true
 
     # TODO formatting required
     # redo : sort on crit and colorize
-"lbs") # COMMAND
+"lbs") # COMMAND: list by severity
     formatted_tsv_headers
     words="CRI SER NOR"
     ctr=1
@@ -2040,7 +2101,7 @@ note: PRIORITY must be anywhere from A to Z."
     #    die "$errmsg"
     #fi;;
         ;;
-"depri") # COMMAND
+"depri" | "dp" ) # COMMAND: removes priority of task
         errmsg="usage: $TODO_SH $action ITEM#"
         common_validation $1 $errmsg 
         #sed  -i.bak "s/^\(title: \[.*\]\) (.)/\1/" $file
@@ -2061,7 +2122,7 @@ note: PRIORITY must be anywhere from A to Z."
         echo -e "$data"
         ;;
 
-"show" ) # COMMAND
+"show" ) # COMMAND: shows an item, defaults to last
         errmsg="usage: $TODO_SH show ITEM#"
         item=$1
         [ -z "$1" ] && {
@@ -2319,7 +2380,7 @@ note: PRIORITY must be anywhere from A to Z."
             done
             ;;
 
-"archive" | "ar" ) # COMMAND: move closed bugs, what about canceled ? XXX
+"archive" | "ar" ) # COMMAND: move closed and canceled bugs
             #regex="${REG_ID}${DELIM}(CLO|CAN)"
             regex="${REG_ID}${DELIM}C[LA][NO]"
             count=$( grep -c   "$regex" "$TSV_FILE" )
@@ -2408,7 +2469,7 @@ note: PRIORITY must be anywhere from A to Z."
             ;;
 
             # what if one fix to be attached to several bugs ?
-"fix" | "addfix" )
+"fix" | "addfix" ) # COMMAND: add a fix / resolution for given item
         errmsg="usage: $TODO_SH $action ITEM#"
         common_validation $1 $errmsg 
         tsv_get_title $item
@@ -2418,7 +2479,7 @@ note: PRIORITY must be anywhere from A to Z."
 
         echo "Updated fix $item. To view, use: show $item"
         ;;
-"status" )
+"status" ) # COMMAND: prints completion status of bugs, features, enhancements, tasks
         bugarch=$(grep -c BUG "$ARCHIVE_FILE" )
         enharch=$(grep -c ENH "$ARCHIVE_FILE" )
         feaarch=$(grep -c FEA "$ARCHIVE_FILE" )
@@ -2466,6 +2527,9 @@ note: PRIORITY must be anywhere from A to Z."
         echo "features     : $feaclo / $feactr " 
         echo "tasks        : $tasclo / $tasctr " 
 ;;
+"help" )
+    help
+    ;;
 * )
     usage
     ;;
