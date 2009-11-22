@@ -430,14 +430,15 @@ _list()
     formatted_tsv_headers 
         items=$(
         cut -c1-$width "$TSV_FILE" \
-        | eval ${TSV_SORT_COMMAND}           \
-        | pretty_print
+        | eval ${TSV_SORT_COMMAND} \
           )
     if [ "${filter_command}" ]; then
         filtered_items=$(echo -ne "$items" | eval ${filter_command})
     else
         filtered_items=$items
     fi
+    filtered_items=$(echo -ne "$filtered_items" | pretty_print)
+
     if [ "$PRINT_DETAILS" == "1" ]; then
         # while read row removes leading and trailing spaces !! FIXME
         #echo -e "$filtered_items" | while read row
@@ -465,6 +466,7 @@ _list()
     fi
 
     if [ $VERBOSE_FLAG -gt 0 ]; then
+        # pretty print has already shown headers
         NUMTASKS=$( echo -ne "$filtered_items" | sed -n '$ =' )
         #TOTALTASKS=$( echo -ne "$items" | sed -n '$ =' )
         # we can do ls +(0-9).txt but not sure how portable and requires extglob
@@ -477,9 +479,10 @@ _list()
         echo "--"
         #echo "${NUMTASKS:-0} of ${TOTALTASKS:-0} issues shown from $ISSUES_DIR"
         echo "${NUMTASKS:-0} of ${TOTALTASKS:-0} issues shown from $TSV_FILE"
-
-        cut -f2 "$TSV_FILE" | awk  '{a[$1] ++} END{for (i in a) print i": "a[i]}' | \
+        echo -ne "$filtered_items" | \
+        cut -d '|' -f2 | awk  '{a[$1] ++} END{for (i in a) printf i": "a[i]"   "}' | \
         sed 's/CAN/canceled/;s/CLO/closed/;s/STO/stopped/;s/OPE/open/;s/STA/started/'
+
     fi
 }
 oldlist()
@@ -1421,9 +1424,19 @@ pretty_print(){
             echo -e "$data"
             tasks=$( echo -e "$data" | grep -c . )
             total_tasks=$( grep -c . "$TSV_FILE" )
+:<<DUMMY
             echo "--"
             echo -n "$tasks of $total_tasks issues shown from "
             show_source
+        echo -e "$data" | \
+        cut -d '|' -f2 | awk  '{a[$1] ++} END{for (i in a) printf " %s: %2d ",i, a[i]}' | \
+        sed 's/CAN/canceled/;s/CLO/closed/;s/STO/stopped/;s/OPE/open/;s/STA/started/'
+
+        echo -e "$data" | \
+        cut -d '|' -f4 | awk  '{b[$1] ++} END{for (i in b) printf " %s: %2d ",i, b[i]}' | \
+        sed 's/ENH/enhancements/;s/FEA/features/;s/BUG/bugs/;s/TAS/tasks/;'
+        echo
+DUMMY
     fi
 }
 # return fields from extra file (comments, description, fix)
@@ -1472,8 +1485,8 @@ show_source(){
 }
 ## short header for reports with on Id and title
 short_title(){
-    echo "   Id |           Title                                   "
-    echo "------+---------------------------------------------------"
+    echo "   Id | B |      Title                                   "
+    echo "------+---+----------------------------------------------"
 }
 
 ## ADD FUNCTIONS ABOVE
@@ -2456,9 +2469,10 @@ note: PRIORITY must be anywhere from A to Z."
             # now that we've removed id from title, i've had to do some jugglery to switch cols
 "quick" | "q" ) # COMMAND a quick report showing status and title sorted on status
         short_title
-        cut -f1,2,8 "$TSV_FILE" | \
-        sed "s/^\(....\)${DELIM}\(...\)/\2\1/"| \
-        sed 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g' | \
+        cut -f1,2,4,8 "$TSV_FILE" | \
+        sed -e "s/^\(....\)${DELIM}\(...\)/\2\1/" \
+        -e 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g'  \
+        -e 's/BUG/#/g;s/ENH/ /g;s/FEA/ /g;s/TAS/./g;' | \
         sort -k1,1 -k3,3 | \
         color_by_priority | \
         pretty_print
@@ -2470,9 +2484,10 @@ note: PRIORITY must be anywhere from A to Z."
             regex="$@"
             [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: grep : $@"
             short_title
-            egrep "$@" "$TSV_FILE" | cut -f1,2,8  | \
-            sed "s/^\(....\)${DELIM}\(...\)/\2\1/"| \
-            sed 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g' | \
+            egrep "$@" "$TSV_FILE" | cut -f1,2,4,8  | \
+            sed -e  "s/^\(....\)${DELIM}\(...\)/\2\1/" \
+            -e  's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g'  \
+            -e 's/BUG/#/g;s/ENH/ /g;s/FEA/ /g;s/TAS/./g;' | \
             sort -k1,1 | pretty_print
 #        show_source
             ;;
