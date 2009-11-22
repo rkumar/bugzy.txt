@@ -626,12 +626,13 @@ log_changes()
     local oldvalue=$2
     local newline=$3
     local file=$4
+    local dlim="~"
     local now=`date "$DATE_FORMAT"`
     [ -z "$key" ] && die "key blank"
     [ -z "$oldvalue" ] && die "oldvalue blank"
     [ -z "$newline" ] && die "newline blank"
     [ -z "$file" ] && die "file blank"
-    data="- LOG,$now,$key,$oldvalue,$newline"
+    data="- LOG${dlim}$now${dlim}$key${dlim}$oldvalue${dlim}$newline"
     echo "$data" >> $file
     echo "$data" >> $item.log.txt
     # combined file, log in another file ?
