@@ -11,9 +11,6 @@ decide whether to knock it off altogether.
 
 Mails are sent using the 'mail' command if specified.
 
-Currently, it is very new, help is not documented, just wait a week or 3
-before using.
-
 I have moved to a tab separated format from key:value flat file.
 however, the old files are still created i have not yet removed them,
 since someone may like it that way.
@@ -109,6 +106,9 @@ You may also alias bugzy to "b" in ~/.bashrc or equivalent.
     > b grep @URG
     > b liststat OPE
     > b newest 5
+
+    > b -h
+    > b help
 
  
 
