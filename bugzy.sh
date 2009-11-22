@@ -1320,6 +1320,11 @@ pretty_print(){
             -e "s/$DELIM/$TSV_OUTPUT_DELIMITER/g" 
             )
             echo -e "$data"
+            tasks=$( echo -e "$data" | grep -c . )
+            total_tasks=$( grep -c . "$TSV_FILE" )
+            echo "--"
+            echo -n "$tasks of $total_tasks issues shown from "
+            show_source
     fi
 }
 # return fields from extra file (comments, description, fix)
@@ -1356,7 +1361,10 @@ color_by_priority(){
           )
           echo -e "$data"
           
-      }
+}
+show_source(){
+  echo $( pwd )/$TSV_FILE
+}
 
 ## ADD FUNCTIONS ABOVE
 out=
@@ -1922,11 +1930,12 @@ done # while true
     regex="^${id}${DELIM}${status}${DELIM}${severity}${DELIM}${type}${DELIM}"
     #id  status  severity        type    assigned_to     date_created    due_date        title
     [ $full_regex -gt 0 ] && regex+="${assigned_to}${DELIM}${date_created}${DELIM}${due_date}${DELIM}${title}"
-    echo "regex:($regex)"
-    tsv_headers
+    [ $VERBOSE_FLAG -gt 1 ] && echo "regex:($regex)"
+    #tsv_headers
+    formatted_tsv_headers 
     # -P is GNU only, wont work everywhere, UGH
     #grep -P "$regex" "$TSV_FILE"
-    grep "$regex" "$TSV_FILE"
+    grep "$regex" "$TSV_FILE" | pretty_print
     
     ;;
 
@@ -2334,6 +2343,8 @@ note: PRIORITY must be anywhere from A to Z."
         sed 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g' | \
         sort -k1,1 -k3,3 | \
         color_by_priority
+
+        show_source
             ;;
 
 "grep" ) # COMMAND uses egrep to run a quick report showing status and title sorted on status
@@ -2343,6 +2354,7 @@ note: PRIORITY must be anywhere from A to Z."
             sed "s/^\(....\)${DELIM}\(...\)/\2\1/"| \
             sed 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g' | \
             sort -k1,1
+        show_source
             ;;
 
 "newest" ) # COMMAND a quick report showing  newest <n> items added
@@ -2352,6 +2364,7 @@ note: PRIORITY must be anywhere from A to Z."
         sed "s/^\(....\)${DELIM}\(...\)/\2\1/"| \
         sed 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g' | \
         color_by_priority
+        show_source
             ;;
 
 "oldest" ) # COMMAND a quick report showing  oldest <n> items added
@@ -2362,6 +2375,7 @@ note: PRIORITY must be anywhere from A to Z."
         sed "s/^\(....\)${DELIM}\(...\)/\2\1/"| \
         sed 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g' | \
         color_by_priority
+        show_source
             ;;
 
 "tag" ) # COMMAND: adds a tag at end of title, with '@' prefixed, helps in searching.
