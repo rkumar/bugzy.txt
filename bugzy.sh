@@ -978,6 +978,45 @@ x
         echo "$item:com:$text" >> "$EXTRA_DATA_FILE"
     }
 }
+add_ml_comment(){
+    RESULT=0 
+                echo "Enter new comment (^D to end):"
+                if which rlwrap > /dev/null; then 
+                    input=$( rlwrap cat )
+                else
+                    input=`cat`
+                fi
+                #read input
+                [ -z "$input" ] || {
+                    start=$(sed -n "/^$reply:/=" $file)
+                    [ -z "$reply" ] && die "No section for $reply found in $file"
+                    now=`date "$DATE_FORMAT"`
+                    #text="- $now: $input"
+                    pretext="- $now: "
+                    text=$( echo "$input" | sed "1s/^/$pretext/g" | sed '2,$s/^/                    \>/g' )
+                    #text=$( echo "$input" | sed "s/^/$pretext/g" )
+ex - $file<<!
+${start}a
+$text
+.
+x
+!
+        #input has newlines
+        loginput=$( echo "$input" | tr '\n' '' )
+        log_changes "$reply" "${loginput:0:15} ..." "${#loginput} chars" "$file"
+        RESULT=1 
+        # for tsv file
+        echo "$text" >> $item.comment.txt
+        # okay as long as one line comment
+        #echo "$item:com:$text" >> "$EXTRA_DATA_FILE"
+        pretext="$item:com:$pretext"
+        #echo "updating new file "
+        # sed almost killed me with the 2,$ operation with some error
+        echo "$input" | sed -e "1s/^/$pretext/g" -e '2,$s/^/'"$pretext"'>/g' >> "$EXTRA_DATA_FILE"
+        #echo "$input" | sed "s/^/$pretext/g" >> "$EXTRA_DATA_FILE"
+        echo "operation complete"
+    }
+}
 add_fix(){
     item=$1
     reply="fix"
@@ -1751,7 +1790,7 @@ EndUsage
     #oldvalue=$(grep -m 1 "^$reply:" $file | cut -d':' -f2-)
     #oldvalue=${oldvalue## }
     # tsv stuff
-    [ "$reply" != "description" -a "$reply" != "fix" ] && {
+    [ "$reply" != "description" -a "$reply" != "fix"  -a "$reply" != "comment" ] && {
     oldvalue=$( tsv_get_column_value $item $reply )
     }
     [ -z "$oldvalue" ] || echo "Select new $reply (old was \"$oldvalue\")"
@@ -1791,7 +1830,8 @@ EndUsage
             ;;
             "comment" )
                    cp $file $file.bak
-                add_comment
+                #add_comment
+                add_ml_comment
                 [ $RESULT -gt 0 ] && {
                     show_diffs
                     let modified+=1
@@ -2289,7 +2329,8 @@ note: PRIORITY must be anywhere from A to Z."
         cp $file $file.bak
         reply="comment"
 
-        add_comment
+        #add_comment
+        add_ml_comment
                 [ $RESULT -gt 0 ] && {
                     show_diffs
                 }
