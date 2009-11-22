@@ -5,9 +5,7 @@
 # rkumar                                                #
 # $Id$  #
 #*******************************************************#
-# TODO: display comments in some listing, long listing
 # TODO: validate fields in show
-# TODO - rename show. this should show one bug or full file
 # TODO - put col widths in hash
 #
 #### --- cleanup code use at start ---- ####
@@ -706,7 +704,6 @@ change_status()
     errmsg="usage: $TODO_SH $action task#"
     common_validation $1 "$errmsg"
     reply="status"; input="$action";
-    # TODO tsv
     oldvalue=`tsv_get_column_value $item $reply`
     #oldvalue=`get_value_for_id $item $reply`
     var=$( printf "%s" "${action:0:3}" | tr 'a-z' 'A-Z' )
@@ -1173,7 +1170,7 @@ tsv_delete_other_files(){
     }
     done
     [ $VERBOSE_FLAG -gt 1 ] && ls -ltrh "$DELETED_DIR"
-    # TODO delete files from here
+    # delete files from here
     grep "^$item:" "$EXTRA_DATA_FILE" >> deleted.extra.txt
     sed -i.bak "/^$item:/d" "$EXTRA_DATA_FILE"
     return $?
@@ -1342,6 +1339,8 @@ get_extra_data(){
     description=$( grep "^$item:${reply:0:3}" "$EXTRA_DATA_FILE"  | cut -d: -f3- )
     [ ! -z "$description" ] && echo "$description"
 }
+
+## updates the long descriptive fields such as description, fix
 update_extra_data(){
     item=$1
     reply=$2
@@ -1351,6 +1350,8 @@ update_extra_data(){
     sed -i.bak "/^$item:${reply:0:3}:/d" "$EXTRA_DATA_FILE"
     echo "$i_desc_pref" >> "$EXTRA_DATA_FILE"
 }
+
+## colors data passed in based on priority
 color_by_priority(){
     data=$(
          sed '''
@@ -1363,8 +1364,15 @@ color_by_priority(){
           echo -e "$data"
           
 }
+
+## prints path of data file, erquired since you may have multiple
 show_source(){
   echo $( pwd )/$TSV_FILE
+}
+## short header for reports with on Id and title
+short_title(){
+    echo "   Id |           Title                                   "
+    echo "------+---------------------------------------------------"
 }
 
 ## ADD FUNCTIONS ABOVE
@@ -1489,11 +1497,17 @@ case $action in
     else
         atitle=$*
     fi
+    #check title for newline at end, this could leave a blank line in file
+    atitle=$( echo "$atitle" | tr -d '\n' )
     [ -z "$atitle" ] && die "Title required for bug"
     [ "$PROMPT_DESC" == "yes" ] && {
-        echo -n "Enter a description (^D to exit): "
+        echo "Enter a description (^D to exit): "
         #read i_desc
-        i_desc=`cat`
+        if which rlwrap > /dev/null; then 
+            i_desc=$( rlwrap cat )
+        else
+            i_desc=`cat`
+        fi
     }
     i_type=${DEFAULT_TYPE:-"bug"}
     i_severity=${DEFAULT_SEVERITY:-"normal"}
@@ -1887,7 +1901,7 @@ done # while true
     oldshowtitles_where_multi "$crit" $ctr
     
     ;;
-    # TODO format the output
+
 "selectm" | "selm") # COMMAND: allows multiple criteria selection key value
     valid="|status|date_created|severity|type|"
     errmsg="usage: $TODO_SH $action \"type: BUG\" \"status: OPE\" ..."
@@ -1964,7 +1978,7 @@ done # while true
     # TODO formatting required
     # redo : sort on crit and colorize
 "lbs") # COMMAND
-    tsv_headers
+    formatted_tsv_headers
     words="CRI SER NOR"
     ctr=1
     for ii in $words
@@ -2338,20 +2352,21 @@ note: PRIORITY must be anywhere from A to Z."
             # put symbold in global vars so consistent TODO, color this based on priority
             # now that we've removed id from title, i've had to do some jugglery to switch cols
 "quick" | "q" ) # COMMAND a quick report showing status and title sorted on status
+        short_title
         cut -f1,2,8 "$TSV_FILE" | \
         sed "s/^\(....\)${DELIM}\(...\)/\2\1/"| \
         sed 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g' | \
         sort -k1,1 -k3,3 | \
-        color_by_priority
+        color_by_priority | \
+        pretty_print
 
-        show_source
+        #show_source
             ;;
 
 "grep" ) # COMMAND uses egrep to run a quick report showing status and title sorted on status
             regex="$@"
             [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: grep : $@"
-            echo "   Id |           Title                                   "
-            echo "------+---------------------------------------------------"
+            short_title
             egrep "$@" "$TSV_FILE" | cut -f1,2,8  | \
             sed "s/^\(....\)${DELIM}\(...\)/\2\1/"| \
             sed 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g' | \
