@@ -24,6 +24,7 @@ arg0=$(basename "$0")
 
 TSV_FILE="data.tsv"
 EXTRA_DATA_FILE="ext.txt"
+ARCHIVE_FILE="archive.txt"
 #TSV_TITLES_FILE="titles.tsv"
 # what fields are we to prompt for in mod
 EDITFIELDS="title description status severity type assigned_to due_date comment fix"
@@ -1023,7 +1024,7 @@ hash_data(){
 ## returns title column, all rows - unused ?
 tsv_titles(){
         #cut -c$TSV_TITLE_OFFSET1- "$TSV_FILE" 
-        cut -c$TSV_TITLE_COLUMN "$TSV_FILE" 
+        cut -f$TSV_TITLE_COLUMN "$TSV_FILE" 
 }
 ## print titles of CSV file
 tsv_headers(){
@@ -2305,7 +2306,6 @@ note: PRIORITY must be anywhere from A to Z."
             ;;
 
 "archive" | "ar" ) # COMMAND: move closed bugs, what about canceled ? XXX
-            ARCHIVE_FILE="archive.txt"
             #regex="${REG_ID}${DELIM}(CLO|CAN)"
             regex="${REG_ID}${DELIM}C[LA][NO]"
             count=$( grep -c   "$regex" "$TSV_FILE" )
@@ -2350,11 +2350,13 @@ note: PRIORITY must be anywhere from A to Z."
 "grep" ) # COMMAND uses egrep to run a quick report showing status and title sorted on status
             regex="$@"
             [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: grep : $@"
+            echo "   Id |           Title                                   "
+            echo "------+---------------------------------------------------"
             egrep "$@" "$TSV_FILE" | cut -f1,2,8  | \
             sed "s/^\(....\)${DELIM}\(...\)/\2\1/"| \
             sed 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g' | \
-            sort -k1,1
-        show_source
+            sort -k1,1 | pretty_print
+#        show_source
             ;;
 
 "newest" ) # COMMAND a quick report showing  newest <n> items added
@@ -2401,7 +2403,54 @@ note: PRIORITY must be anywhere from A to Z."
 
         echo "Updated fix $item. To view, use: show $item"
         ;;
-
+"status" )
+        bugarch=$(grep -c BUG "$ARCHIVE_FILE" )
+        enharch=$(grep -c ENH "$ARCHIVE_FILE" )
+        feaarch=$(grep -c FEA "$ARCHIVE_FILE" )
+        tasarch=$(grep -c TAS "$ARCHIVE_FILE" )
+        bugctr=$bugarch
+        bugclo=$bugarch
+        feactr=$feaarch
+        feaclo=$feaarch
+        enhctr=$enharch
+        enhclo=$enharch
+        tasctr=$tasarch
+        tasclo=$tasarch
+        ctr=0
+        data=$( cut -f2,4 $TSV_FILE)
+        for LINE in $( echo "$data" )
+        do
+            ((ctr+=1))
+        if [[ $LINE =~ BUG ]]
+        then
+            (( bugctr+=1 ))
+            [[ $LINE =~ CLO ]] &&  (( bugclo+=1 ));
+        else
+            if [[ $LINE =~ FEA ]]
+            then
+                (( feactr+=1 ))
+                [[ $LINE =~ CLO ]] &&  (( feaclo+=1 ));
+            else
+                if [[ $LINE =~ ENH ]]
+                then
+                    (( enhctr+=1 ))
+                    [[ $LINE =~ CLO ]] &&  (( enhclo+=1 ));
+                else
+                    if [[ $LINE =~ TAS ]]
+                    then
+                        (( tasctr+=1 ))
+                        [[ $LINE =~ CLO ]] &&  (( tasclo+=1 ));
+                    fi
+                fi
+            fi
+        fi
+        done
+        # actually, here we move closed items to archived so usually closed will be zero !!
+        echo "bugs         : $bugclo / $bugctr " 
+        echo "enhancements : $enhclo / $enhctr " 
+        echo "features     : $feaclo / $feactr " 
+        echo "tasks        : $tasclo / $tasctr " 
+;;
 * )
     usage
     ;;
