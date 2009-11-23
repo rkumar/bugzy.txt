@@ -40,17 +40,37 @@ User Documentation
 
 The bug files are created in a directory ".todos" inside TODO_DIR.
 
+
+### Dependencies
+
+Unfortunately, some reports do require **GNU's date** (coreutils). In `add`, I have
+coded so GNU will fail through to BSD then to perl, but there's a lot
+of work to do the same for all date calcs. There is a big difference in
+the options of GNU and BSD :-(.
+
+If you use BSD date, pls install gnu's date as `gdate` and in bugzy.sh replace 
+    DATE=$( date )
+with
+    DATE=$( gdate )
+
 ### Usage
 
-Current operations include add, mod, edit (edit the file itself), delete, list, list by severity,
-show, tag, quick, grep.
+Current operations include add, mod, delete, list, list by severity,
+show, tag, quick/q (listing), grep, qadd (quick add).
 
 When adding an issue, entry of fields can be reduced by adding a default
 in the config file, and setting PROMPT to NO. When entering due_date, a
 value such as "+3 days" or "tomorrow" may be entered (provided your
 version of `date` can do the conversion.
 
-Actions to directly change status are open, started, closed, canceled, stopped or the first 3 letter of each.
+You can add an issue with only a title using  `qadd`. Defaults will be
+used for other fields, or can be passed on the command line (use help
+option for examples).
+ 
+`b qadd --type:bug --severity:cri --due_date:2009-12-26 "a title"`
+
+Actions to directly change status are open, started, closed, canceled,
+stopped or the first 3 letter of each.
 
 "selectm" or "selm" is a multiple criteria search as:
 
