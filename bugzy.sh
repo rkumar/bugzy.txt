@@ -693,6 +693,7 @@ convert_due_date()
    then
        input=${input:1}
        result=$(date --date "$input" "$DUE_DATE_FORMAT")
+       result=$(date_calc "$input" "$DUE_DATE_FORMAT")
    else
        result=$input
    fi
@@ -1405,8 +1406,11 @@ calc_overdue()
 # removed the pesky id in titles, to colorize titles i am colorizing data after last tab
 # \+ does not work in my sed, but works in gsed
 pretty_print(){
-    tomorrow=`date --date="tomorrow" '+%Y-%m-%d'`
-    dayafter=`date --date="+2 days" '+%Y-%m-%d'`
+    #tomorrow=`date --date="tomorrow" '+%Y-%m-%d'`
+    tomorrow=$( date_calc +1 )
+
+    #dayafter=`date --date="+2 days" '+%Y-%m-%d'`
+    dayafter=$( date_calc +2 )
     if (( $PRETTY_PRINT > 0 ));
     then
         local data=$( sed -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
@@ -1488,6 +1492,59 @@ short_title(){
     echo "   Id | B |      Title                                   "
     echo "------+---+----------------------------------------------"
 }
+
+## first use gnu date format to  calc
+## if fails use BSD style date
+## pass only "+n" or "-n". do not pass days or months.
+## e.g. $( date_calc +3 )
+date_calc()
+{
+DATE=date
+val=${1:-"+0"}
+local my_format=${2:-'+%Y-%m-%d'}
+[ "$val" == "tomorrow" ] && val="+1";
+[ "$val" == "dayafter" ] && val="+2";
+today=$(date "$my_format")
+$DATE --date="$val days" > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    result=$( $DATE --date="$val days" "$my_format" )
+else
+    $DATE -v "${val}d" > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        result=$( $DATE -v "${val}d" "$my_format" )
+    else
+        result=$today
+        # last ditch resort to perl
+        result=$( perl -le 'my ($y, $m, $d)=(localtime(time + '$val'*86400))[5,4,3]; $y+=1900; $m++;print "$y-$m-$d"' )
+    fi
+fi
+echo "$result"
+}
+## add function creates old format file
+create_flat_file()
+{
+    [ -d "$ISSUES_DIR" ] || mkdir "$ISSUES_DIR"
+    editfile=$ISSUES_DIR/${serialid}.txt
+      ## CAUTION: programs that use this require one space aftr colon, don't reformat this
+    sed -e 's/^    //' <<EndUsage >"$editfile"
+    title: $atitle
+    id: $serialid
+    description:
+                $i_desc
+    date_created: $now
+    status: $tabstat
+    severity: $tabseve
+    type: $tabtype
+    assigned_to: $ASSIGNED_TO
+    due_date: $i_due_date
+    comment: 
+
+    fix: 
+    log:
+
+EndUsage
+}
+ 
 
 ## ADD FUNCTIONS ABOVE
 out=
@@ -1612,8 +1669,8 @@ case $action in
         atitle=$*
     fi
     #check title for newline at end, this could leave a blank line in file
-    atitle=$( echo "$atitle" | tr -d '\n' )
     [ -z "$atitle" ] && die "Title required for bug"
+    atitle=$( echo "$atitle" | tr -d '\n' )
     [ "$PROMPT_DESC" == "yes" ] && {
         echo "Enter a description (^D to exit): "
         #read i_desc
@@ -1684,6 +1741,9 @@ case $action in
       tabseve=$( echo ${i_severity:0:3} | tr "a-z" "A-Z" )
       tabtype=$( echo ${i_type:0:3} | tr "a-z" "A-Z" )
 
+      create_flat_file
+
+:<<DUMMY
       ## CAUTION: programs that use this require one space aftr colon, don't reformat this
     sed -e 's/^    //' <<EndUsage >"$editfile"
     title: $atitle
@@ -1702,6 +1762,7 @@ case $action in
     log:
 
 EndUsage
+DUMMY
     #$EDITOR $editfile
     fi
     ## save as tab delimited -- trying out
@@ -2407,7 +2468,8 @@ note: PRIORITY must be anywhere from A to Z."
             # now check field 7, convert to unix epoch and compare to now, if greater.
             # if less then break out, no more printing
             now=`date '+%Y-%m-%d'`
-            tomorrow=`date --date="tomorrow" '+%Y-%m-%d'`
+            #tomorrow=`date --date="tomorrow" '+%Y-%m-%d'`
+            tomorrow=$( date_calc +1 )
             cat "$TSV_FILE" | sort -t$'\t' -k7 -r | while read LINE
             do
                 due_date=$( echo "$LINE" | cut -f7 )
@@ -2583,6 +2645,36 @@ note: PRIORITY must be anywhere from A to Z."
         echo "enhancements : $enhclo / $enhctr " 
         echo "features     : $feaclo / $feactr " 
         echo "tasks        : $tasclo / $tasctr " 
+;;
+"qadd" )
+    atitle=$*
+    [ -z "$atitle" ] && die "Title required for bug"
+    #check title for newline at end, this could leave a blank line in file
+    del=$DELIM
+    atitle=$( echo "$atitle" | tr -d '\n' )
+    i_type=${DEFAULT_TYPE:-"bug"}
+    i_severity=${DEFAULT_SEVERITY:-"normal"}
+    i_status=${DEFAULT_STATUS:-"open"}
+    i_due_date=`convert_due_date "$DEFAULT_DUE_DATE"`
+    [  -z "$i_due_date" ] && i_due_date=" "
+    i_due_date=$( printf "%-10s" "$i_due_date" )
+    ASSIGNED_TO=$( printf "%-10s" "$ASSIGNED_TO" )
+    ASSIGNED_TO=${ASSIGNED_TO:0:10}
+    short_type=$( echo "${i_type:0:1}" | tr 'a-z' 'A-Z' )
+    serialid=`get_next_id`
+    task="[$short_type #$serialid]"
+    todo="$task $atitle" # now used only in mail subject
+    tabtitle="[#$serialid] $atitle"
+        now=`date "$DATE_FORMAT"`
+      tabstat=$( echo ${i_status:0:3} | tr "a-z" "A-Z" )
+      tabseve=$( echo ${i_severity:0:3} | tr "a-z" "A-Z" )
+      tabtype=$( echo ${i_type:0:3} | tr "a-z" "A-Z" )
+      tabid=$( printf "%4s" "$serialid" )
+      tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$now${del}$i_due_date${del}$atitle"
+      echo "$tabfields" >> "$TSV_FILE"
+      # do this or else common_val doesn't let me proceed
+      create_flat_file
+      [ ! -z "$EMAIL_TO" ] && echo -e "created $todo using qada\n$tabfields" | mail -s "$todo" $EMAIL_TO
 ;;
 "help" )
     help
