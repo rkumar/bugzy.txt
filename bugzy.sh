@@ -1523,6 +1523,21 @@ echo "$result"
 ## add function creates old format file
 create_flat_file()
 {
+    del=$DELIM
+    ASSIGNED_TO=$( printf "%-10s" "$ASSIGNED_TO" )
+    ASSIGNED_TO=${ASSIGNED_TO:0:10}
+    short_type=$( echo "${i_type:0:1}" | tr 'a-z' 'A-Z' )
+    serialid=`get_next_id`
+    task="[$short_type #$serialid]"
+    todo="$task $atitle" # now used only in mail subject
+    tabtitle="[#$serialid] $atitle"
+        now=`date "$DATE_FORMAT"`
+      tabstat=$( echo ${i_status:0:3} | tr "a-z" "A-Z" )
+      tabseve=$( echo ${i_severity:0:3} | tr "a-z" "A-Z" )
+      tabtype=$( echo ${i_type:0:3} | tr "a-z" "A-Z" )
+      tabid=$( printf "%4s" "$serialid" )
+      tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$now${del}$i_due_date${del}$atitle"
+      echo "$tabfields" >> "$TSV_FILE"
     [ -d "$ISSUES_DIR" ] || mkdir "$ISSUES_DIR"
     editfile=$ISSUES_DIR/${serialid}.txt
       ## CAUTION: programs that use this require one space aftr colon, don't reformat this
@@ -1543,6 +1558,13 @@ create_flat_file()
     log:
 
 EndUsage
+      [ ! -z "$i_desc" ] && echo "$i_desc" > $serialid.description.txt
+      # combined file approach
+      [ ! -z "$i_desc" ] && {
+          i_desc_pref=$( echo "$i_desc" | sed "s/^/$serialid:des:/g" )
+          #echo "$serialid:des:$i_desc" >> "$EXTRA_DATA_FILE"
+          echo "$i_desc_pref" >> "$EXTRA_DATA_FILE"
+      }
 }
  
 
@@ -1719,69 +1741,18 @@ case $action in
         read assigned_to
         [ ! -z "$assigned_to" ] && ASSIGNED_TO=$assigned_to
     }
-    ASSIGNED_TO=$( printf "%-10s" "$ASSIGNED_TO" )
-    ASSIGNED_TO=${ASSIGNED_TO:0:10}
 
-    short_type=$( echo "${i_type:0:1}" | tr 'a-z' 'A-Z' )
+    #short_type=$( echo "${i_type:0:1}" | tr 'a-z' 'A-Z' )
 
     #serialid=`incr_id`
-    serialid=`get_next_id`
-    task="[$short_type #$serialid]"
-    todo="$task $atitle" # now used only in mail subject
-    tabtitle="[#$serialid] $atitle"
-    [ -d "$ISSUES_DIR" ] || mkdir "$ISSUES_DIR"
-    editfile=$ISSUES_DIR/${serialid}.txt
-    if [ -f $editfile ];
-    then
-        $EDITOR $editfile
-    else
-      #  echo "title: $todo" > "$editfile"
-        now=`date "$DATE_FORMAT"`
-      tabstat=$( echo ${i_status:0:3} | tr "a-z" "A-Z" )
-      tabseve=$( echo ${i_severity:0:3} | tr "a-z" "A-Z" )
-      tabtype=$( echo ${i_type:0:3} | tr "a-z" "A-Z" )
+    #serialid=`get_next_id`
+    #task="[$short_type #$serialid]"
+    #todo="$task $atitle" # now used only in mail subject
+    #tabtitle="[#$serialid] $atitle"
 
-      create_flat_file
+    del=$DELIM
+    create_flat_file
 
-:<<DUMMY
-      ## CAUTION: programs that use this require one space aftr colon, don't reformat this
-    sed -e 's/^    //' <<EndUsage >"$editfile"
-    title: $atitle
-    id: $serialid
-    description:
-                $i_desc
-    date_created: $now
-    status: $tabstat
-    severity: $tabseve
-    type: $tabtype
-    assigned_to: $ASSIGNED_TO
-    due_date: $i_due_date
-    comment: 
-
-    fix: 
-    log:
-
-EndUsage
-DUMMY
-    #$EDITOR $editfile
-    fi
-    ## save as tab delimited -- trying out
-      del="	"
-      tabstat=$( echo ${i_status:0:3} | tr "a-z" "A-Z" )
-      tabseve=$( echo ${i_severity:0:3} | tr "a-z" "A-Z" )
-      tabtype=$( echo ${i_type:0:3} | tr "a-z" "A-Z" )
-      tabid=$( printf "%4s" "$serialid" )
-      
-      #tabfields="$tabstat${del}$tabseve${del}$tabtype${del}$serialid${del}$now${del}$ASSIGNED_TO${del}$i_due_date${del}$todo"
-      tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$now${del}$i_due_date${del}$atitle"
-      echo "$tabfields" >> "$TSV_FILE"
-      [ ! -z "$i_desc" ] && echo "$i_desc" > $serialid.description.txt
-      # combined file approach
-      [ ! -z "$i_desc" ] && {
-          i_desc_pref=$( echo "$i_desc" | sed "s/^/$serialid:des:/g" )
-          #echo "$serialid:des:$i_desc" >> "$EXTRA_DATA_FILE"
-          echo "$i_desc_pref" >> "$EXTRA_DATA_FILE"
-      }
 
     process_quadoptions  "$SEND_EMAIL" "Send file by email?"
     #[ $RESULT == "yes" ] && get_input "emailid" "$ASSIGNED_TO"
@@ -2658,23 +2629,21 @@ note: PRIORITY must be anywhere from A to Z."
     i_due_date=`convert_due_date "$DEFAULT_DUE_DATE"`
     [  -z "$i_due_date" ] && i_due_date=" "
     i_due_date=$( printf "%-10s" "$i_due_date" )
-    ASSIGNED_TO=$( printf "%-10s" "$ASSIGNED_TO" )
-    ASSIGNED_TO=${ASSIGNED_TO:0:10}
-    short_type=$( echo "${i_type:0:1}" | tr 'a-z' 'A-Z' )
-    serialid=`get_next_id`
-    task="[$short_type #$serialid]"
-    todo="$task $atitle" # now used only in mail subject
-    tabtitle="[#$serialid] $atitle"
-        now=`date "$DATE_FORMAT"`
-      tabstat=$( echo ${i_status:0:3} | tr "a-z" "A-Z" )
-      tabseve=$( echo ${i_severity:0:3} | tr "a-z" "A-Z" )
-      tabtype=$( echo ${i_type:0:3} | tr "a-z" "A-Z" )
-      tabid=$( printf "%4s" "$serialid" )
-      tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$now${del}$i_due_date${del}$atitle"
-      echo "$tabfields" >> "$TSV_FILE"
+        #short_type=$( echo "${i_type:0:1}" | tr 'a-z' 'A-Z' )
+        #serialid=`get_next_id`
+        #task="[$short_type #$serialid]"
+        #todo="$task $atitle" # now used only in mail subject
+        #    now=`date "$DATE_FORMAT"`
+        #  tabstat=$( echo ${i_status:0:3} | tr "a-z" "A-Z" )
+        #  tabseve=$( echo ${i_severity:0:3} | tr "a-z" "A-Z" )
+        #  tabtype=$( echo ${i_type:0:3} | tr "a-z" "A-Z" )
+        #  tabid=$( printf "%4s" "$serialid" )
+        #  tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$now${del}$i_due_date${del}$atitle"
+        #  echo "$tabfields" >> "$TSV_FILE"
       # do this or else common_val doesn't let me proceed
       create_flat_file
-      [ ! -z "$EMAIL_TO" ] && echo -e "created $todo using qada\n$tabfields" | mail -s "$todo" $EMAIL_TO
+        [ ! -z "$EMAIL_TO" ] && echo "$tabfields" | tr '\t' '\n' | mail -s "$todo" $EMAIL_TO
+      
 ;;
 "help" )
     help
