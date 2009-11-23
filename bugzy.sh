@@ -2572,7 +2572,7 @@ note: PRIORITY must be anywhere from A to Z."
         sed -e "s/^\(....\)${DELIM}\(...\)/\2\1/" \
         -e 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g'  \
         -e 's/BUG/#/g;s/ENH/./g;s/FEA/./g;s/TAS/,/g;' | \
-        sort -k1,1 -k3,3 | \
+        sort -k1,1 -k3,4 | \
         color_by_priority | \
         pretty_print
 
