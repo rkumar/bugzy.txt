@@ -342,10 +342,10 @@ IFS="$oldIFS"
 }
 
 hash_set "VALUES" "status" "open started closed stopped canceled "
-hash_set "VALUES" "severity" "normal critical serious"
+hash_set "VALUES" "severity" "normal critical moderate"
 hash_set "VALUES" "type" "bug feature enhancement task"
 hash_set "TSVVALUES" "status" "OPE STA CLO STO CAN"
-hash_set "TSVVALUES" "severity" "NOR CRI SER"
+hash_set "TSVVALUES" "severity" "NOR CRI MOD"
 hash_set "TSVVALUES" "type" "BUG FEA ENH TAS"
 
 # edits temporary file, remember to cleanup after
@@ -645,7 +645,8 @@ log_changes()
     [ -z "$file" ] && die "file blank"
     data="- LOG${dlim}$now${dlim}$key${dlim}$oldvalue${dlim}$newline"
     echo "$data" >> $file
-    echo "$data" >> $item.log.txt
+        # stop creating those files
+    #echo "$data" >> $item.log.txt
     # combined file, log in another file ?
     echo "$item:log:$data" >> "$EXTRA_DATA_FILE"
     #i_desc_pref=$( echo "$data" | sed "s/^/$item:log:/g" )
@@ -967,6 +968,7 @@ show_info4(){
                 #w=$RESULT
                 #str="$str "$(printf "%-*s" $w "$f" )" |"
     }
+    ## i am not using add_ml_comment
 add_comment(){
     RESULT=0 
                 echo "Enter new comment:"
@@ -984,8 +986,10 @@ x
 !
         log_changes "$action" "${input:0:15} ..." "${#input} chars" "$file"
         RESULT=1 
+
+        ## stop creating those files
+        ##echo "$text" >> $item.comment.txt
         # for tsv file
-        echo "$text" >> $item.comment.txt
         # okay as long as one line comment
         echo "$item:com:$text" >> "$EXTRA_DATA_FILE"
     }
@@ -1018,7 +1022,8 @@ x
         log_changes "$reply" "${loginput:0:25} ..." "${#loginput} chars" "$file"
         RESULT=1 
         # for tsv file
-        echo "$text" >> $item.comment.txt
+        # stop creating those files
+        #echo "$text" >> $item.comment.txt
         # okay as long as one line comment
         #echo "$item:com:$text" >> "$EXTRA_DATA_FILE"
         pretext="$item:com:$pretext"
@@ -1341,7 +1346,7 @@ convert_short_to_long_code(){
         echo "$codeval" | sed 's/CAN/canceled/;s/CLO/closed/;s/STO/stopped/;s/OPE/open/;s/STA/started/'
         ;;
         "severity" )
-        echo "$codeval" | sed 's/NOR/normal/;s/SER/serious/;s/CRI/critical/'
+        echo "$codeval" | sed 's/NOR/normal/;s/MOD/moderate/;s/CRI/critical/'
         ;;
         "type" )
         echo "$codeval" | sed 's/BUG/bug/;s/ENH/enhancement/;s/FEA/feature/'
@@ -1433,7 +1438,7 @@ pretty_print(){
     then
         local data=$( sed -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
             -e  "s/${DELIM}CRI${DELIM}/${DELIM}${PRI_A}CRI${DEFAULT}${DELIM}/g" \
-            -e  "s/${DELIM}SER${DELIM}/${DELIM}${PRI_A}SER${DEFAULT}${DELIM}/g" \
+            -e  "s/${DELIM}MOD${DELIM}/${DELIM}${PRI_A}MOD${DEFAULT}${DELIM}/g" \
             -e  "/^....${DELIM}CLO${DELIM}/s/^ /x/g" \
             -e  "/^....${DELIM}CAN${DELIM}/s/^ /x/g" \
             -e  "/^....${DELIM}OPE${DELIM}/s/^ /_/g" \
@@ -1576,7 +1581,8 @@ create_flat_file()
     log:
 
 EndUsage
-      [ ! -z "$i_desc" ] && echo "$i_desc" > $serialid.description.txt
+# stop creating those files
+#      [ ! -z "$i_desc" ] && echo "$i_desc" > $serialid.description.txt
       # combined file approach
       [ ! -z "$i_desc" ] && {
           i_desc_pref=$( echo "$i_desc" | sed "s/^/$serialid:des:/g" )
@@ -1854,7 +1860,7 @@ case $action in
     modified=0
     item=$1
     common_validation $1 $errmsg
-    #severity_values="critical serious normal"
+    #severity_values="critical moderate normal"
     #type_values="bug feature enhancement task"
     #MAINCHOICES=$(grep '^[a-z_0-9]*:' $file | egrep -v '^log:|^date_|^id:' | cut -d':' -f1  )
     MAINCHOICES="$EDITFIELDS"
@@ -1975,7 +1981,8 @@ x
     echo " "
     }
     # tsv stuff
-    echo "$text" > $item.$reply.txt
+        # stop creating those files
+    #echo "$text" > $item.$reply.txt
     update_extra_data $item $reply "$text"
 #    i_desc_pref=$( echo "$text" | sed "s/^/$item:${reply:0:3}:/g" )
 #    #echo "$item:${reply:0:3}:$text" >> "$EXTRA_DATA_FILE"
@@ -2154,7 +2161,7 @@ done # while true
     FILELIST=$tasks
     [ -z "$FILELIST" ] || print_tasks
     FILELIST=$OLDLIST
-    tasks=$(grep -l -m 1 "^severity: SER" $FILELIST)
+    tasks=$(grep -l -m 1 "^severity: MOD" $FILELIST)
     #echo "tasks[$tasks]"
     USEPRI=$PRI_B
     FILELIST=$tasks
@@ -2171,7 +2178,7 @@ done # while true
     # redo : sort on crit and colorize
 "lbs") # COMMAND: list by severity
     formatted_tsv_headers
-    words="CRI SER NOR"
+    words="CRI MOD NOR"
     ctr=1
     for ii in $words
     do
@@ -2196,6 +2203,7 @@ done # while true
         #item=$1
         change_status $item "$action"
     done
+    cleanup
         ;;
 
         # TODO allow multiple items ?
@@ -2603,6 +2611,7 @@ note: PRIORITY must be anywhere from A to Z."
                 sed -i.bak "/^$paditem/s/.*/& $tag/" "$TSV_FILE"
                 [ "$?" -eq 0 ] && echo "Tagged $item with $tag";
             done
+            cleanup
             ;;
 
             # what if one fix to be attached to several bugs ?
@@ -2699,7 +2708,8 @@ note: PRIORITY must be anywhere from A to Z."
         #  echo "$tabfields" >> "$TSV_FILE"
       # do this or else common_val doesn't let me proceed
       create_flat_file
-        [ ! -z "$EMAIL_TO" ] && echo "$tabfields" | tr '\t' '\n' | mail -s "$todo" $EMAIL_TO
+      [ ! -z "$EMAIL_TO" ] && echo "$tabfields" | tr '\t' '\n' | mail -s "$todo" $EMAIL_TO
+      cleanup
       
 ;;
 "help" )
