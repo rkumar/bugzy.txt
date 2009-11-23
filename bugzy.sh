@@ -1015,16 +1015,18 @@ x
 !
         #input has newlines
         loginput=$( echo "$input" | tr '\n' '' )
-        log_changes "$reply" "${loginput:0:15} ..." "${#loginput} chars" "$file"
+        log_changes "$reply" "${loginput:0:25} ..." "${#loginput} chars" "$file"
         RESULT=1 
         # for tsv file
         echo "$text" >> $item.comment.txt
         # okay as long as one line comment
         #echo "$item:com:$text" >> "$EXTRA_DATA_FILE"
         pretext="$item:com:$pretext"
+        # C-a processing, adding
+        echo "${pretext}$loginput" >> "$EXTRA_DATA_FILE"  # this has control A's, so we can pull one line and subst ^A with nl.
         #echo "updating new file "
         # sed almost killed me with the 2,$ operation with some error
-        echo "$input" | sed -e "1s/^/$pretext/g" -e '2,$s/^/'"$pretext"'>/g' >> "$EXTRA_DATA_FILE"
+        #echo "$input" | sed -e "1s/^/$pretext/g" -e '2,$s/^/'"$pretext"'>/g' >> "$EXTRA_DATA_FILE"
         #echo "$input" | sed "s/^/$pretext/g" >> "$EXTRA_DATA_FILE"
         echo "operation complete"
     }
@@ -1378,7 +1380,15 @@ print_item(){
             row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
             output+=$( echo -e "\n$row\n" )
             output+="\n"
-            output+=$( echo "$description" | sed 's/^/  /g'  )
+            if [[ $xfile == "comment" ]]; then
+                # C-a processing
+                # next line was indenting second comment too
+                #output+=$( echo "$description" | tr '' '\n' | sed 's/^/  /g;2,$s/^/  /g'  )
+                output+=$( echo "$description" | tr '' '\n' | sed 's/^/  /g;'  )
+            else
+                output+=$( echo "$description" | sed 's/^/  /g'  )
+            fi
+            #echo "$description" | tr '' '\n' | sed 's/^/  /g;2,$s/^/                    /g'
             output+="\n"
         }
         done
@@ -2298,7 +2308,9 @@ note: PRIORITY must be anywhere from A to Z."
             row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
             echo -e "$row"
             #echo "$description"
-            echo "$description" | sed 's/^/  /g' 
+            # moved to comment lines written as one line with control A in place of newline
+            #echo "$description" | tr '' '\n' | sed 's/^/  /g;2,$s/^/                    /g'
+            echo "$description" | tr '' '\n' | sed 's/^/  /g;'
             echo
 #            dfile="${item}.${xfile}.txt" 
 #            [ -f "$dfile" ] && { 
