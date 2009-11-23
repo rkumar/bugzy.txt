@@ -178,6 +178,14 @@ help() # COMMAND: shows help
         q
           Prints a list of titles with status on left.
 
+        qadd TITLE
+          (Quickly) add an item passing only title on command-line. All other values will be defaults
+
+        qadd --type:bug --severity:cri --due_date:2009-12-26 "TITLE..."
+          (Quickly) add an item passing only title on command-line. You may override defaults for
+          type, severity, status and due_date as arguments. No spaces in -- commands.
+          
+
         tag TAG item1 item1 ...
           Appends a tag to multiple items, prefixed with @
 
@@ -1566,6 +1574,33 @@ EndUsage
           echo "$i_desc_pref" >> "$EXTRA_DATA_FILE"
       }
 }
+getoptlong()
+{
+    ## check for -- settings, break into key and value
+    ## no spaces, :  used to delimit key and value
+    echo "inside getoptl"
+    shifted=0
+    while true
+    do
+        if [[ "${1:0:2}" == "--" ]]; then
+            f=${1:2}
+            val="${f#*:}"
+            key="${f%:*}"
+            # declare will be local when we move this to a function
+            #declare i_${key}=$val
+            # sorry, in this case we were setting i_ vars
+            read i_${key} <<< $val
+            #echo " i_${key}=$val"
+            ((shifted+=1))
+            shift
+        else
+            break
+        fi
+    done
+    #what's left, if you want
+    i_rest=$*
+    # check shifted to see how much to shift
+}
  
 
 ## ADD FUNCTIONS ABOVE
@@ -2618,15 +2653,25 @@ note: PRIORITY must be anywhere from A to Z."
         echo "tasks        : $tasclo / $tasctr " 
 ;;
 "qadd" )
-    atitle=$*
-    [ -z "$atitle" ] && die "Title required for bug"
-    #check title for newline at end, this could leave a blank line in file
-    del=$DELIM
-    atitle=$( echo "$atitle" | tr -d '\n' )
+## b qadd --type:bug --severity:cri --due_date:2009-12-26 "using --params: command upc needs formatting"
+# validatoin required. TODO
     i_type=${DEFAULT_TYPE:-"bug"}
     i_severity=${DEFAULT_SEVERITY:-"normal"}
     i_status=${DEFAULT_STATUS:-"open"}
     i_due_date=`convert_due_date "$DEFAULT_DUE_DATE"`
+    ## check for -- settings, break into key and value
+    getoptlong "$@"
+    shift $shifted
+    #echo "type:$i_type"
+    #echo "seve:$i_severity"
+    #echo "left: $i_rest"
+    atitle=$*
+    #echo "title:$atitle"
+    #read
+    [ -z "$atitle" ] && die "Title required for bug"
+    #check title for newline at end, this could leave a blank line in file
+    del=$DELIM
+    atitle=$( echo "$atitle" | tr -d '\n' )
     [  -z "$i_due_date" ] && i_due_date=" "
     i_due_date=$( printf "%-10s" "$i_due_date" )
         #short_type=$( echo "${i_type:0:1}" | tr 'a-z' 'A-Z' )
