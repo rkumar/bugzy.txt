@@ -6,3 +6,7 @@
 bak
 tmp
 t.*
+*.bak
+todo.txt
+done.txt
+report.txt
