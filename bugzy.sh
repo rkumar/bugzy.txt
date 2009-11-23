@@ -2173,7 +2173,7 @@ note: PRIORITY must be anywhere from A to Z."
         #sed  -i.bak -e "s/^\(title: \[.*\]\) (.)/\1/" -e  "s/^\(title: \[.*\]\)/\1 ($newpri)/" $file
         # praps better to search title and replace 
         #sed  -i.bak -e "s/^\(title: \)(.)/\1/" -e  "s/^\(title: \)/\1 ($newpri)/" $file
-        sed  -i.bak -e "/^title: /s/(.)//" -e  "s/^\(title: \)/\1($newpri)/" $file
+        sed  -i.bak -e "/^title: /s/(.)//" -e  "s/^\(title: \)/\1($newpri) /" $file
         # tsv stuff
         oldvalue=$( tsv_get_column_value $item "title" )
         #newvalue=$( echo "$oldvalue" | sed  -e "s/^\(\[.*\]\) (.)/\1/" -e  "s/^\(\[.*\]\)/\1 ($newpri)/" )
