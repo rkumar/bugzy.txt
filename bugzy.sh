@@ -1482,6 +1482,7 @@ get_extra_data(){
 }
 
 ## updates the long descriptive fields such as description, fix
+## only changes TSV file. TODO what of others
 update_extra_data(){
     item=$1
     reply=$2
@@ -2318,7 +2319,11 @@ note: PRIORITY must be anywhere from A to Z."
             #echo "$description"
             # moved to comment lines written as one line with control A in place of newline
             #echo "$description" | tr '' '\n' | sed 's/^/  /g;2,$s/^/                    /g'
-            echo "$description" | tr '' '\n' | sed 's/^/  /g;'
+            if [[ $xfile == "comment" ]]; then
+                echo "$description" | tr '' '\n' | sed 's/^/  /g;'
+            else
+                echo "$description" | sed 's/^/  /g;'
+            fi
             echo
 #            dfile="${item}.${xfile}.txt" 
 #            [ -f "$dfile" ] && { 
@@ -2490,15 +2495,20 @@ note: PRIORITY must be anywhere from A to Z."
             ;;
 
             #TODO headers and pipe separator
+            #TODO remove CLO
 "upcoming" | "upc" ) # COMMAND: shows upcoming tasks
             # now check field 7, convert to unix epoch and compare to now, if greater.
             # if less then break out, no more printing
             now=`date '+%Y-%m-%d'`
             #tomorrow=`date --date="tomorrow" '+%Y-%m-%d'`
             tomorrow=$( date_calc +1 )
-            cat "$TSV_FILE" | sort -t$'\t' -k7 -r | while read LINE
+            grep -v "${DELIM}CLO${DELIM}" "$TSV_FILE" | sort -t$'\t' -k7 -r | \
+            sed -e 's/OPE/-/g;s/CLO/x/g;s/STA/@/g;s/STO/$/g;s/CAN/x/g'  \
+            -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
+            -e 's/BUG/#/g;s/ENH/./g;s/FEA/./g;s/TAS/,/g;' | \
+            ( while read LINE
             do
-                due_date=$( echo "$LINE" | cut -f7 )
+                due_date=$( echo "$LINE" | cut -d  $'\t' -f7 )
                 #currow=$( date --date="2009-11-25 00:00" +%s )
                 currow=$( date --date="$due_date" +%s )
                 today=$( date +%s )
@@ -2521,6 +2531,7 @@ note: PRIORITY must be anywhere from A to Z."
                     break
                 fi
             done
+            ) | sed -e "s/$DELIM/$TSV_OUTPUT_DELIMITER/g" | color_by_priority 
             ;;
 
 "archive" | "ar" ) # COMMAND: move closed and canceled bugs
@@ -2560,7 +2571,7 @@ note: PRIORITY must be anywhere from A to Z."
         cut -f1,2,4,8 "$TSV_FILE" | \
         sed -e "s/^\(....\)${DELIM}\(...\)/\2\1/" \
         -e 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g'  \
-        -e 's/BUG/#/g;s/ENH/ /g;s/FEA/ /g;s/TAS/./g;' | \
+        -e 's/BUG/#/g;s/ENH/./g;s/FEA/./g;s/TAS/,/g;' | \
         sort -k1,1 -k3,3 | \
         color_by_priority | \
         pretty_print
@@ -2620,10 +2631,10 @@ note: PRIORITY must be anywhere from A to Z."
         common_validation $1 $errmsg 
         tsv_get_title $item
         echo "Enter a fix or resolution for $item"
-        add_fix 
+        add_fix $item
+        echo "Updated fix $item. To view, use: show $item"
         cleanup
 
-        echo "Updated fix $item. To view, use: show $item"
         ;;
 "status" ) # COMMAND: prints completion status of bugs, features, enhancements, tasks
         bugarch=$(grep -c BUG "$ARCHIVE_FILE" )
