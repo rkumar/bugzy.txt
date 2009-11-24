@@ -663,6 +663,7 @@ add_ml_comment(){
                     #input has newlines
                     loginput=$( echo "$input" | tr '\n' '' )
                     RESULT=1 
+                    ## TODO this should move to update_extra_header
                     # for tsv file
                     pretext="$item:com:$pretext"
                     # C-a processing, adding
@@ -695,7 +696,6 @@ add_fix(){
     edit_tmpfile
     [ $RESULT -gt 0 ] && {
         text=$(cat $TMP_FILE)
-        text=$( echo "$text" | tr '\n' '' )
         update_extra_data $item $reply "$text"
         log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
         let modified+=1
@@ -942,7 +942,7 @@ print_item(){
             # C-a processing
             # next line was indenting second comment too
             #output+=$( echo "$description" | tr '' '\n' | sed 's/^/  /g;2,$s/^/  /g'  )
-            output+=$( echo "$description" | tr '' '\n' | sed 's/^/  /g;'  )
+            output+=$( echo "$description" |  sed 's/^/  /g;'  )
             #echo "$description" | tr '' '\n' | sed 's/^/  /g;2,$s/^/                    /g'
             output+="\n"
         }
@@ -1017,7 +1017,6 @@ DUMMY
     fi
 }
 # return fields from extra file (comments, description, fix)
-# TODO - should this not convert C-a to nl, so caller does not need to know
 #  2009-11-19 12:48 
 get_extra_data(){
     item=$1
@@ -1027,7 +1026,7 @@ get_extra_data(){
     # combined file approach
     regex="^$item:${reply:0:3}" 
     description=$( grep "^$item:${reply:0:3}" "$EXTRA_DATA_FILE"  | cut -d: -f3- )
-    [ ! -z "$description" ] && echo "$description"
+    [ ! -z "$description" ] && echo "$description" | tr '' '\n'
 }
 
 ## updates the long descriptive fields such as description, fix
@@ -1036,8 +1035,8 @@ get_extra_data(){
 update_extra_data(){
     item=$1
     reply=$2
-    text="$3"
-    #echo "$item:${reply:0:3}:$text" >> "$EXTRA_DATA_FILE"
+    local text="$3"
+    text=$( echo "$text" | tr '\n' '' )
     i_desc_pref=$( echo "$text" | sed "s/^/$item:${reply:0:3}:/g" )
     sed -i.bak "/^$item:${reply:0:3}:/d" "$EXTRA_DATA_FILE"
     echo "$i_desc_pref" >> "$EXTRA_DATA_FILE"
@@ -1102,6 +1101,7 @@ create_tsv_file()
     ASSIGNED_TO=${ASSIGNED_TO:0:10}
     short_type=$( echo "${i_type:0:1}" | tr 'a-z' 'A-Z' )
     serialid=`get_next_id`
+    item=$serialid
     task="[$short_type #$serialid]"
     todo="$task $atitle" # now used only in mail subject
     tabtitle="[#$serialid] $atitle"
@@ -1482,8 +1482,7 @@ case $action in
                 [ $RESULT -gt 0 ] && {
                    text=$(cat $TMP_FILE)
                    # tsv stuff
-                   tsvtext=$( echo "$text" | tr '\n' '' )
-                   update_extra_data $item $reply "$tsvtext"
+                   update_extra_data $item $reply "$text"
                    [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && {
                    start=$(sed -n "/^$reply:/=" $file)
                    let end=$start+$lines
@@ -1714,7 +1713,7 @@ note: PRIORITY must be anywhere from A to Z."
             # moved to comment lines written as one line with control A in place of newline
             #echo "$description" | tr '' '\n' | sed 's/^/  /g;2,$s/^/                    /g'
             # C-a processing
-            echo "$description" | tr '' '\n' | sed 's/^/  /g;'
+            echo "$description" | sed 's/^/  /g;'
             echo
         }
         done
