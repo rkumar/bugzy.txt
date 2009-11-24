@@ -1049,6 +1049,7 @@ add_fix(){
     edit_tmpfile
     [ $RESULT -gt 0 ] && {
         text=$(cat $TMP_FILE)
+        text=$( echo "$text" | tr '\n' '' )
         update_extra_data $item $reply "$text"
         log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
         let modified+=1
@@ -1385,14 +1386,10 @@ print_item(){
             row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
             output+=$( echo -e "\n$row\n" )
             output+="\n"
-            if [[ $xfile == "comment" ]]; then
-                # C-a processing
-                # next line was indenting second comment too
-                #output+=$( echo "$description" | tr '' '\n' | sed 's/^/  /g;2,$s/^/  /g'  )
-                output+=$( echo "$description" | tr '' '\n' | sed 's/^/  /g;'  )
-            else
-                output+=$( echo "$description" | sed 's/^/  /g'  )
-            fi
+            # C-a processing
+            # next line was indenting second comment too
+            #output+=$( echo "$description" | tr '' '\n' | sed 's/^/  /g;2,$s/^/  /g'  )
+            output+=$( echo "$description" | tr '' '\n' | sed 's/^/  /g;'  )
             #echo "$description" | tr '' '\n' | sed 's/^/  /g;2,$s/^/                    /g'
             output+="\n"
         }
@@ -1595,7 +1592,7 @@ getoptlong()
 {
     ## check for -- settings, break into key and value
     ## no spaces, :  used to delimit key and value
-    echo "inside getoptl"
+    #echo "inside getoptl"
     shifted=0
     while true
     do
@@ -1617,6 +1614,12 @@ getoptlong()
     #what's left, if you want
     i_rest=$*
     # check shifted to see how much to shift
+}
+# show what the symbols are
+# enh and fea and task are deliberately dot and comma so that bug stands out.
+legend(){
+    echo
+    echo '(-) open/unstarted,  (@) started,  (x) closed.   (#)  bug,  (.) enh/feature, (,) task'
 }
  
 
@@ -1984,6 +1987,7 @@ x
     # tsv stuff
         # stop creating those files
     #echo "$text" > $item.$reply.txt
+    text=$( echo "$text" | tr '\n' '' )
     update_extra_data $item $reply "$text"
 #    i_desc_pref=$( echo "$text" | sed "s/^/$item:${reply:0:3}:/g" )
 #    #echo "$item:${reply:0:3}:$text" >> "$EXTRA_DATA_FILE"
@@ -2319,11 +2323,8 @@ note: PRIORITY must be anywhere from A to Z."
             #echo "$description"
             # moved to comment lines written as one line with control A in place of newline
             #echo "$description" | tr '' '\n' | sed 's/^/  /g;2,$s/^/                    /g'
-            if [[ $xfile == "comment" ]]; then
-                echo "$description" | tr '' '\n' | sed 's/^/  /g;'
-            else
-                echo "$description" | sed 's/^/  /g;'
-            fi
+            # C-a processing
+            echo "$description" | tr '' '\n' | sed 's/^/  /g;'
             echo
 #            dfile="${item}.${xfile}.txt" 
 #            [ -f "$dfile" ] && { 
@@ -2576,6 +2577,7 @@ note: PRIORITY must be anywhere from A to Z."
         color_by_priority | \
         pretty_print
 
+        legend
         #show_source
             ;;
 
