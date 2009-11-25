@@ -1709,15 +1709,15 @@ note: PRIORITY must be anywhere from A to Z."
         # these m ones should go as add-ons. TODO
 "mpri" | "mp" )
 ## t mpri Z 1 2 3 4
-newpri=$2
+newpri=$1
 shift
 while true
 do
-    if [[ -z "$2" ]]; then
+    if [[ -z "$1" ]]; then
         break
     fi
-    item=$2
-    $TODO_SH pri $item $newpri
+    item=$1
+    $TODO_SH  -d "$PROG_CFG_FILE" pri $item $newpri
     shift
 done
 ;;
@@ -1725,11 +1725,11 @@ done
 ## t mdel 1 2 3 4
 while true
 do
-    if [[ -z "$2" ]]; then
+    if [[ -z "$1" ]]; then
         break
     fi
-    item=$2
-    $TODO_SH del $item
+    item=$1
+    $TODO_SH -d "$PROG_CFG_FILE" del $item
     shift
 done
 ;;
@@ -1737,11 +1737,11 @@ done
 ## t mdepri 1 2 3 4
 while true
 do
-    if [[ -z "$2" ]]; then
+    if [[ -z "$1" ]]; then
         break
     fi
-    item=$2
-    $TODO_SH depri $item
+    item=$1
+    $TODO_SH  -d "$PROG_CFG_FILE" depri $item
     shift
 done
 ;;
