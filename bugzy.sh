@@ -42,6 +42,7 @@ export TSV_TITLE_COLUMN=8
 TSV_CREATE_FLAT_FILE=0
 TSV_WRITE_FLAT_FILE=0
 TODOTXT_FORCE=0
+TSV_ADD_COMMENT_COUNT_TO_TITLE=1
 #ext=${1:-"default value"}
 #today=$(date +"%Y-%m-%d-%H%M")
 
@@ -494,6 +495,26 @@ log_changes()
     [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && echo "$data" >> $file
 
 }
+log_changes1()
+{
+    local key=$1
+    local logtext="$2"
+    #local oldvalue=$2
+    #local newline=$3
+    #local file=$4
+    local dlim="~"
+    local now=`date "$DATE_FORMAT"`
+    [ -z "$key" ] && die "key blank"
+    #[ -z "$oldvalue" ] && die "oldvalue blank"
+    #[ -z "$newline" ] && die "newline blank"
+    #[ -z "$file" ] && die "flat file name blank"
+    #data="- LOG${dlim}$now${dlim}$key${dlim}$oldvalue${dlim}$newline"
+    data=$( echo -en "$logtext" | tr '\n' ' ')
+    # combined file, log in another file ?
+    echo "$item:log:$key:$now${dlim}$data" >> "$EXTRA_DATA_FILE"
+    [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && echo "$data" >> $file
+
+}
 ## get_code "type"
 get_code()
 {
@@ -606,7 +627,8 @@ change_status()
         newcode=`convert_long_to_short_code $input`
         tsv_set_column_value $item $reply $newcode
         echo "$item is now $newcode ($input)"
-        log_changes $reply "$oldvalue" $newcode $file
+        #log_changes $reply "$oldvalue" $newcode $file
+        log_changes1 $reply "$reply changed from $oldvalue to $newcode"
         #mtitle=`get_title $item`
         mtitle=`tsv_get_title $item`
         [ ! -z "$EMAIL_TO" ] && echo "$item changed from $oldvalue to $newcode" | mail -s "[$var] $mtitle" $EMAIL_TO
@@ -661,6 +683,8 @@ add_ml_comment(){
                     now=`date "$DATE_FORMAT"`
                     pretext="- $now: "
                     #input has newlines
+                    # make in format (3/16): meaning 3 lines, 16 chars
+                    howmanylines=$( echo -en "$input" | wc -cl | tr -s ' ' | sed 's/^ /(/;s/$/)/;s# #/#')
                     loginput=$( echo "$input" | tr '\n' '' )
                     RESULT=1 
                     ## TODO this should move to update_extra_header
@@ -679,9 +703,21 @@ $text
 x
 !
 }
-        log_changes "$reply" "${loginput:0:25} ..." "${#loginput} chars" "$file"
-        echo "operation complete"
-    }
+        #log_changes "$reply" "$reply added.${loginput:0:25} ..." "${#loginput} chars" "$file"
+        log_changes1 "$reply" "$reply added $howmanylines.${loginput:0:40} ..." 
+        echo "Comment added to $item"
+        [ "$TSV_ADD_COMMENT_COUNT_TO_TITLE" -gt 0 ] && add_comment_count_to_title;
+    
+}
+}
+add_comment_count_to_title(){
+    count=$( grep -c "^$item:com:" "$EXTRA_DATA_FILE" )
+    # tsv stuff
+    oldvalue=$( tsv_get_column_value $item "title" )
+    newvalue=$( echo "$oldvalue" | sed  -e "s/ ([0-9]*)$//" -e  "s/$/ ($count)/" )
+    echo "updating title to $newvalue"
+    tsv_set_column_value $item "title" "$newvalue"
+    echo "updated title to $newvalue"
 }
 add_fix(){
     item=$1
@@ -696,8 +732,9 @@ add_fix(){
     edit_tmpfile
     [ $RESULT -gt 0 ] && {
         text=$(cat $TMP_FILE)
+        howmanylines=$( echo -en "$text" | wc -cl | tr -s ' ' | sed 's/^ /(/;s/$/)/;s# #/#')
         update_extra_data $item $reply "$text"
-        log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
+        log_changes1 $reply "Fix added $howmanylines. ${text:0:40}..."
         let modified+=1
     }
 }
@@ -1026,7 +1063,13 @@ get_extra_data(){
     # combined file approach
     regex="^$item:${reply:0:3}" 
     description=$( grep "^$item:${reply:0:3}" "$EXTRA_DATA_FILE"  | cut -d: -f3- )
-    [ ! -z "$description" ] && echo "$description" | tr '' '\n'
+    if [ ! -z "$description" ]; then
+        if [ $reply == "log" ]; then
+            echo "$description" | sed 's/^[^:]*:/On /;s/~/, /1;' |  tr '' ' '
+        else
+            echo "$description" | tr '' '\n'
+        fi
+    fi
 }
 
 ## updates the long descriptive fields such as description, fix
@@ -1393,6 +1436,8 @@ case $action in
     modified=0
     item=$1
     common_validation $1 $errmsg
+    mtitle=`tsv_get_title $item`
+    echo "Modifying item titled '$mtitle'"
     MAINCHOICES="$EDITFIELDS"
     while true
     do
@@ -1426,7 +1471,8 @@ case $action in
         now=`date "$DATE_FORMAT"`
         [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
         tsv_set_column_value $item $reply $newcode
-        log_changes $reply $oldvalue $newcode $file
+        #log_changes $reply $oldvalue $newcode $file
+        log_changes1 $reply "$reply changed from $oldvalue to $newcode"
         let modified+=1
         echo "$item modified ..."
         #show_diffs
@@ -1438,7 +1484,8 @@ case $action in
                 [ $RESULT -gt 0 ] && {
                    text=$(cat $TMP_FILE)
                    tsv_set_column_value $item $reply "$text"
-                   log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
+                   #log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
+                   log_changes1 $reply "$reply changed to ${text:0:40}..."
                    [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak "/^$reply:/s/^.*$/$reply: $text/" $file
                    #show_diffs 
                    let modified+=1
@@ -1464,7 +1511,8 @@ case $action in
             text="$due_date"
                    tsv_set_column_value $item "due_date" "$text"
 
-                   log_changes $reply "${oldvalue}" "${text}" "$file"
+                   #log_changes $reply "${oldvalue}" "${text}" "$file"
+                   log_changes1 $reply "$reply changed from ${oldvalue} to ${text}"
                    [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak "/^$reply:/s/^.*$/$reply: $text/" $file
                    #show_diffs 
                    let modified+=1
@@ -1495,7 +1543,9 @@ $text
 x
 !
 }
-        log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
+        #log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
+        howmanylines=$( echo -e "$text" | wc -cl | tr -s ' ' | sed 's/^ /(/;s/$/)/;s# #/#')
+        log_changes1 $reply "$reply changed $howmanylines. ${text:0:40}..."
                    let modified+=1
 
     #show_diffs $file $file.bak.1 
@@ -1622,7 +1672,8 @@ done # while true
     cleanup
         ;;
 
-        # TODO allow multiple items ?
+        # TODO allow multiple items ? take mpri from todo
+        # TODO should log change
 "pri" ) # COMMAND: give priority to a task, appears in title and colored and sorted in some reports
 
     errmsg="usage: $TODO_SH $action ITEM# PRIORITY
@@ -1636,13 +1687,14 @@ note: PRIORITY must be anywhere from A to Z."
 
         # tsv stuff
         oldvalue=$( tsv_get_column_value $item "title" )
-        newvalue=$( echo "$oldvalue" | sed  -e "s/^(.)//" -e  "s/^/($newpri) /" )
+        newvalue=$( echo "$oldvalue" | sed  -e "s/^([A-Z]) //" -e  "s/^/($newpri) /" )
         tsv_set_column_value $item "title" "$newvalue"
         # praps better to search title and replace 
         [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed  -i.bak -e "/^title: /s/(.)//" -e  "s/^\(title: \)/\1($newpri) /" $file
         cleanup
         ;;
 "depri" | "dp" ) # COMMAND: removes priority of task
+        # TODO should log change
         errmsg="usage: $TODO_SH $action ITEM#"
         common_validation $1 $errmsg 
         # tsv stuff
@@ -1654,6 +1706,45 @@ note: PRIORITY must be anywhere from A to Z."
         cleanup
         ;;
 
+        # these m ones should go as add-ons. TODO
+"mpri" | "mp" )
+## t mpri Z 1 2 3 4
+newpri=$2
+shift
+while true
+do
+    if [[ -z "$2" ]]; then
+        break
+    fi
+    item=$2
+    $TODO_SH pri $item $newpri
+    shift
+done
+;;
+"mdel" | "mrm" )
+## t mdel 1 2 3 4
+while true
+do
+    if [[ -z "$2" ]]; then
+        break
+    fi
+    item=$2
+    $TODO_SH del $item
+    shift
+done
+;;
+"mdepri" | "mdp" )
+## t mdepri 1 2 3 4
+while true
+do
+    if [[ -z "$2" ]]; then
+        break
+    fi
+    item=$2
+    $TODO_SH depri $item
+    shift
+done
+;;
 
 "show" ) # COMMAND: shows an item, defaults to last
         errmsg="usage: $TODO_SH show ITEM#"
@@ -1934,6 +2025,7 @@ note: PRIORITY must be anywhere from A to Z."
 ;;
 "qadd" )
 ## b qadd --type:bug --severity:cri --due_date:2009-12-26 "using --params: command upc needs formatting"
+# TODO can we start with a priority too?
 # validatoin required. TODO
     i_type=${DEFAULT_TYPE:-"bug"}
     i_severity=${DEFAULT_SEVERITY:-"normal"}
@@ -1959,6 +2051,9 @@ note: PRIORITY must be anywhere from A to Z."
       cleanup
       
 ;;
+"recentlog" )
+    grep ':log:' ext.txt | tail | cut -d : -f1,4- | sed 's/:/ | /1;s/~/ | /'
+    ;;
 "help" )
     help
     ;;
