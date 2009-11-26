@@ -674,12 +674,16 @@ get_display_widths()
 
 add_ml_comment(){
     RESULT=0 
+    if [ $# -gt 0 ]; then
+        input=$*
+    else
                 echo "Enter new comment (^D to end):"
                 if which rlwrap > /dev/null; then 
                     input=$( rlwrap cat )
                 else
                     input=`cat`
                 fi
+    fi
                 #read input
                 [ -z "$input" ] || {
                     #[ -z "$reply" ] && die "No section for $reply found in $file"
@@ -718,9 +722,9 @@ add_comment_count_to_title(){
     # tsv stuff
     oldvalue=$( tsv_get_column_value $item "title" )
     newvalue=$( echo "$oldvalue" | sed  -e "s/ ([0-9]*)$//" -e  "s/$/ ($count)/" )
-    echo "updating title to $newvalue"
+#    echo "updating title to $newvalue"
     tsv_set_column_value $item "title" "$newvalue"
-    echo "updated title to $newvalue"
+#    echo "updated title to $newvalue"
 }
 add_fix(){
     item=$1
@@ -1496,7 +1500,7 @@ case $action in
             ;;
             "comment" )
                 #add_comment
-                add_ml_comment
+                add_ml_comment 
                 [ $RESULT -gt 0 ] && {
                     #show_diffs
                     let modified+=1
@@ -1828,7 +1832,8 @@ done
         reply="comment"
 
         #add_comment
-        add_ml_comment
+        shift
+        add_ml_comment $*
         cleanup
         ;;
 
