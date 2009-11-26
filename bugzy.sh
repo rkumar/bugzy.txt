@@ -4,10 +4,12 @@
 #                                                       
 # 2009-11-24 v0.1.12 - am removing old flat file creation
 # rkumar                                                
-# $Id$  #
+# 
 #
+# TODO - entry of title, check for tab and replace with spaces
 # TODO: validate fields in show
 # TODO - put col widths in hash
+# CAUTION: we are putting priority at start of title, and tags *and* comment count at end.
 #
 
 #### --- cleanup code use at start ---- ####
@@ -1986,9 +1988,12 @@ done
             ;;
 
 "tag" ) # COMMAND: adds a tag at end of title, with '@' prefixed, helps in searching.
+ # TODO XXX tag added after comment !!!
             tag="@$1"
             errmsg="usage: $TODO_SH $action TAG ITEM#"
+            [ -z "$1" ] && die "Tag required. $errmsg"
             shift
+            [ $# -eq 0 ] && die "Item/s required. $errmsg"
             for item in "$@"
             do
                 common_validation $item "$errmsg"
@@ -2068,14 +2073,14 @@ done
     i_status=${DEFAULT_STATUS:-"open"}
     i_due_date=`convert_due_date "$DEFAULT_DUE_DATE"`
     ## check for -- settings, break into key and value
-    #OPT_PREFIX="i"
+    OPT_PREFIX="i"
     #getoptlong "$@"
     #shift $shifted
     for arg in ${!opt_@}
     do
-        read ${OPT_PREFIX}_${arg:4} <<< $arg
+        read ${OPT_PREFIX}_${arg:4} <<< $( eval 'echo -n "$'$arg' "') 
     done
-    #echo "type:$i_type"
+    echo "type:$i_type"
     #echo "seve:$i_severity"
     #echo "left: $i_rest"
     atitle=$*
