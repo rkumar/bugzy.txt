@@ -33,6 +33,8 @@ TSV_PRETTY_PRINT=1
 # should desc and comments be printed in "list" command
 TSV_PRINT_DETAILS=0
 TSV_OUTPUT_DELIMITER=" | "
+TSV_NOW=`date "$DATE_FORMAT"`
+TSV_NOW_SHORT=`date "$DUE_DATE_FORMAT"`
 # input delimiter or IFS
 export DELIM=$'\t'
 export TSV_TITLE_OFFSET1=57 # with id - DONT USE
@@ -484,12 +486,12 @@ log_changes()
     local newline=$3
     local file=$4
     local dlim="~"
-    local now=`date "$DATE_FORMAT"`
+    #local now=`date "$DATE_FORMAT"`
     [ -z "$key" ] && die "key blank"
     [ -z "$oldvalue" ] && die "oldvalue blank"
     [ -z "$newline" ] && die "newline blank"
     #[ -z "$file" ] && die "flat file name blank"
-    data="- LOG${dlim}$now${dlim}$key${dlim}$oldvalue${dlim}$newline"
+    data="- LOG${dlim}$TSV_NOW${dlim}$key${dlim}$oldvalue${dlim}$newline"
     # combined file, log in another file ?
     echo "$item:log:$data" >> "$EXTRA_DATA_FILE"
     [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && echo "$data" >> $file
@@ -503,15 +505,15 @@ log_changes1()
     #local newline=$3
     #local file=$4
     local dlim="~"
-    local now=`date "$DATE_FORMAT"`
+    TSV_NOW=`date "$DATE_FORMAT"`
     [ -z "$key" ] && die "key blank"
     #[ -z "$oldvalue" ] && die "oldvalue blank"
     #[ -z "$newline" ] && die "newline blank"
     #[ -z "$file" ] && die "flat file name blank"
-    #data="- LOG${dlim}$now${dlim}$key${dlim}$oldvalue${dlim}$newline"
+    #data="- LOG${dlim}$TSV_NOW${dlim}$key${dlim}$oldvalue${dlim}$newline"
     data=$( echo -en "$logtext" | tr '\n' ' ')
     # combined file, log in another file ?
-    echo "$item:log:$key:$now${dlim}$data" >> "$EXTRA_DATA_FILE"
+    echo "$item:log:$key:$TSV_NOW${dlim}$data" >> "$EXTRA_DATA_FILE"
     [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && echo "$data" >> $file
 
 }
@@ -621,14 +623,14 @@ change_status()
     echo "$item is currently $oldvalue ($oldvaluelong)"
         newcode=`convert_long_to_short_code $input`
         newline="$reply: $newcode"
-        now=`date "$DATE_FORMAT"`
+        #now=`date "$DATE_FORMAT"`
         [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
         # tsv stuff
         newcode=`convert_long_to_short_code $input`
         tsv_set_column_value $item $reply $newcode
         echo "$item is now $newcode ($input)"
         #log_changes $reply "$oldvalue" $newcode $file
-        log_changes1 $reply "$reply changed from $oldvalue to $newcode"
+        log_changes1 $reply "#$item $input on $TSV_NOW"
         #mtitle=`get_title $item`
         mtitle=`tsv_get_title $item`
         [ ! -z "$EMAIL_TO" ] && echo "$item changed from $oldvalue to $newcode" | mail -s "[$var] $mtitle" $EMAIL_TO
@@ -636,6 +638,7 @@ change_status()
 }
 ## for actions that require a bug id
 ## sets item, file
+## TODO set title and lineno in one shot, so we don't keep checking for it, maybe even other fields
 common_validation()
 {
     item=$1
@@ -680,8 +683,8 @@ add_ml_comment(){
                 #read input
                 [ -z "$input" ] || {
                     #[ -z "$reply" ] && die "No section for $reply found in $file"
-                    now=`date "$DATE_FORMAT"`
-                    pretext="- $now: "
+                    #now=`date "$DATE_FORMAT"`
+                    pretext="- $TSV_NOW: "
                     #input has newlines
                     # make in format (3/16): meaning 3 lines, 16 chars
                     howmanylines=$( echo -en "$input" | wc -cl | tr -s ' ' | sed 's/^ /(/;s/$/)/;s# #/#')
@@ -693,7 +696,7 @@ add_ml_comment(){
                     # C-a processing, adding
                     echo "${pretext}$loginput" >> "$EXTRA_DATA_FILE"  # this has control A's, so we can pull one line and subst ^A with nl.
 [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && {
-pretext="- $now: "
+pretext="- $TSV_NOW: "
 text=$( echo "$input" | sed "1s/^/$pretext/g" | sed '2,$s/^/                    \>/g' )
 start=$(sed -n "/^$reply:/=" $file)
 ex - $file<<!
@@ -709,7 +712,7 @@ x
         [ "$TSV_ADD_COMMENT_COUNT_TO_TITLE" -gt 0 ] && add_comment_count_to_title;
     
 }
-}
+} # add_ml
 add_comment_count_to_title(){
     count=$( grep -c "^$item:com:" "$EXTRA_DATA_FILE" )
     # tsv stuff
@@ -1148,12 +1151,12 @@ create_tsv_file()
     task="[$short_type #$serialid]"
     todo="$task $atitle" # now used only in mail subject
     tabtitle="[#$serialid] $atitle"
-    now=`date "$DATE_FORMAT"`
+    #now=`date "$DATE_FORMAT"`
     tabstat=$( echo ${i_status:0:3} | tr "a-z" "A-Z" )
     tabseve=$( echo ${i_severity:0:3} | tr "a-z" "A-Z" )
     tabtype=$( echo ${i_type:0:3} | tr "a-z" "A-Z" )
     tabid=$( printf "%4s" "$serialid" )
-    tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$now${del}$i_due_date${del}$atitle"
+    tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$TSV_NOW${del}$i_due_date${del}$atitle"
     echo "$tabfields" >> "$TSV_FILE"
     [ -d "$ISSUES_DIR" ] || mkdir "$ISSUES_DIR"
 # stop creating those files
@@ -1177,7 +1180,7 @@ create_flat_file()
     id: $serialid
     description:
                 $i_desc
-    date_created: $now
+    date_created: $TSV_NOW
     status: $tabstat
     severity: $tabseve
     type: $tabtype
@@ -1468,7 +1471,7 @@ case $action in
         newcode=`convert_long_to_short_code $input` # not required now since its new code
         echo "input is $longcode ($newcode)"
         newline="$reply: $newcode" # for FLAT file
-        now=`date "$DATE_FORMAT"`
+        TSV_NOW=`date "$DATE_FORMAT"`
         [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
         tsv_set_column_value $item $reply $newcode
         #log_changes $reply $oldvalue $newcode $file
@@ -1852,7 +1855,7 @@ done
                 today=$( date +%s )
                 if [ $currow -ge $today ];
                 then
-                    if [ $now == ${due_date:0:10} ];
+                    if [ $TSV_NOW == ${due_date:0:10} ];
                     then
                         LINE=$( echo -e "$PRI_A$LINE$DEFAULT" )
                         echo -e "$LINE"
@@ -1905,6 +1908,8 @@ done
             # put symbold in global vars so consistent TODO, color this based on priority
             # now that we've removed id from title, i've had to do some jugglery to switch cols
 "quick" | "q" ) # COMMAND a quick report showing status and title sorted on status
+        stime=$SECONDS
+        START=$(date +%s.%N)
         short_title
         cut -f1,2,4,8 "$TSV_FILE" | \
         sed -e "s/^\(....\)${DELIM}\(...\)/\2\1/" \
@@ -1916,6 +1921,11 @@ done
 
         legend
         #show_source
+        stime2=$SECONDS
+        END=$(date +%s.%N)
+        #echo $(( stime2 - stime )) " seconds"
+        DIFF=$(echo "$END - $START" | bc)
+        echo $DIFF " seconds."
             ;;
 
 "grep" ) # COMMAND uses egrep to run a quick report showing status and title sorted on status
