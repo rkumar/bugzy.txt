@@ -2062,8 +2062,12 @@ done
       cleanup
       
 ;;
-"recentlog" )
+"recentlog" | "rl")
     grep ':log:' ext.txt | tail | cut -d : -f1,4- | sed 's/:/ | /1;s/~/ | /'
+    ;;
+"recentcomment" | "rc" )
+ # silly sed does not respect tab or newline, gsed does. So I went through some hoops to indent comment
+    grep ':com:' ext.txt | tail | cut -d : -f1,3- | sed 's/:/ | /1;s/~/ | /' | sed "s//   /g;" | tr '' '\n'
     ;;
 "help" )
     help
