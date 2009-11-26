@@ -116,9 +116,10 @@ help() # COMMAND: shows help
         ar 
           Moves closed and canceled items to archive.txt
 
-        comment NUMBER
-        addcomment NUMBER
-          to add a comment to an item
+        comment NUMBER [TEXT]
+        addcomment NUMBER [TEXT]
+          to add a comment to an item. If not given on command line, a multi-line comment
+          will be prompted for.
 
         modify NUMBER
         mod NUMBER
@@ -193,17 +194,20 @@ help() # COMMAND: shows help
           
 
         tag TAG item1 item1 ...
-          Appends a tag to multiple items, prefixed with @
+          Appends a tag to multiple items, prefixing the tag with @
 
         print NUMBER
           Prints details of given item
 
-        open     NUMBER
-        started  NUMBER
-        closed   NUMBER
-        canceled NUMBER
+        open     NUMBER # means unstarted /new
+        started  NUMBER # work has begun
+        closed   NUMBER # fixed and closed
+        canceled NUMBER # no work done. No fix. Rejected.
         stopped  NUMBER
           change status of given item/s. May also use first 3 characters
+
+        clo --comment:"i am testing a comment from CL" 209
+          change status and add a (related) comment at the same time.
 
         upcoming
         upc 
@@ -212,6 +216,14 @@ help() # COMMAND: shows help
         viewlog  NUMBER
         viewcomment NUMBER
            view comments for an item
+
+        recentlog 
+        rl
+        list recent activity from logs
+
+        recentcomments 
+        rc
+        list recent comments
 
 EndHelp
     exit 0
@@ -635,6 +647,10 @@ change_status()
         mtitle=`tsv_get_title $item`
         [ ! -z "$EMAIL_TO" ] && echo "#$item changed from $oldvalue to $newcode" | mail -s "[$var] $mtitle" $EMAIL_TO
         #show_diffs 
+        [ ! -z "$opt_comment" ] && {
+        echo "Adding comment ($opt_comment) to $item"
+            add_ml_comment "$opt_comment"
+        }
 }
 ## for actions that require a bug id
 ## sets item, file
@@ -674,6 +690,7 @@ get_display_widths()
 
 add_ml_comment(){
     RESULT=0 
+    reply="comment"
     if [ $# -gt 0 ]; then
         input=$*
     else
@@ -691,7 +708,7 @@ add_ml_comment(){
                     pretext="- $TSV_NOW: "
                     #input has newlines
                     # make in format (3/16): meaning 3 lines, 16 chars
-                    howmanylines=$( echo -en "$input" | wc -cl | tr -s ' ' | sed 's/^ /(/;s/$/)/;s# #/#')
+                    howmanylines=$( echo -e "$input" | wc -cl | tr -s ' ' | sed 's/^ /(/;s/$/)/;s# #/#')
                     loginput=$( echo "$input" | tr '\n' '' )
                     RESULT=1 
                     ## TODO this should move to update_extra_header
@@ -712,7 +729,7 @@ x
 }
         #log_changes "$reply" "$reply added.${loginput:0:25} ..." "${#loginput} chars" "$file"
         log_changes1 "$reply" "$reply added $howmanylines.${loginput:0:40} ..." 
-        echo "Comment added to $item"
+        echo "$reply added to $item"
         [ "$TSV_ADD_COMMENT_COUNT_TO_TITLE" -gt 0 ] && add_comment_count_to_title;
     
 }
@@ -739,7 +756,7 @@ add_fix(){
     edit_tmpfile
     [ $RESULT -gt 0 ] && {
         text=$(cat $TMP_FILE)
-        howmanylines=$( echo -en "$text" | wc -cl | tr -s ' ' | sed 's/^ /(/;s/$/)/;s# #/#')
+        howmanylines=$( echo -e "$text" | wc -cl | tr -s ' ' | sed 's/^ /(/;s/$/)/;s# #/#')
         update_extra_data $item $reply "$text"
         log_changes1 $reply "Fix added $howmanylines. ${text:0:40}..."
         let modified+=1
@@ -1203,6 +1220,7 @@ getoptlong()
     ## no spaces, :  used to delimit key and value
     #echo "inside getoptl"
     shifted=0
+    OPT_PREFIX=${OPT_PREFIX:-opt}
     while true
     do
         if [[ "${1:0:2}" == "--" ]]; then
@@ -1212,7 +1230,7 @@ getoptlong()
             # declare will be local when we move this to a function
             #declare i_${key}=$val
             # sorry, in this case we were setting i_ vars
-            read i_${key} <<< $val
+            read ${OPT_PREFIX}_${key} <<< $val
             #echo " i_${key}=$val"
             ((shifted+=1))
             shift
@@ -1329,7 +1347,9 @@ action=$( printf "%s\n" "$ACTION" | tr 'A-Z' 'a-z' )
 
 #action=$( printf "%s\n" "$1" | tr 'A-Z' 'a-z' )
 shift
-
+    getoptlong "$@"
+    shift $shifted
+    set | grep '^opt_'
 case $action in
     "print" ) # COMMAND: print details of one item
     print_item $1
@@ -2039,7 +2059,7 @@ done
         echo "features     : $feaclo / $feactr " 
         echo "tasks        : $tasclo / $tasctr " 
 ;;
-"qadd" )
+"qadd" ) # COMMAND: quickly add an issue from command line, no prompting
 ## b qadd --type:bug --severity:cri --due_date:2009-12-26 "using --params: command upc needs formatting"
 # TODO can we start with a priority too?
 # validatoin required. TODO
@@ -2048,8 +2068,13 @@ done
     i_status=${DEFAULT_STATUS:-"open"}
     i_due_date=`convert_due_date "$DEFAULT_DUE_DATE"`
     ## check for -- settings, break into key and value
-    getoptlong "$@"
-    shift $shifted
+    #OPT_PREFIX="i"
+    #getoptlong "$@"
+    #shift $shifted
+    for arg in ${!opt_@}
+    do
+        read ${OPT_PREFIX}_${arg:4} <<< $arg
+    done
     #echo "type:$i_type"
     #echo "seve:$i_severity"
     #echo "left: $i_rest"
@@ -2067,12 +2092,14 @@ done
       cleanup
       
 ;;
-"recentlog" | "rl")
-    grep ':log:' ext.txt | tail | cut -d : -f1,4- | sed 's/:/ | /1;s/~/ | /'
+"recentlog" | "rl") # COMMAND: list recent logs
+    # TODO, we should show the title too , somehow
+    grep ':log:' "$EXTRA_DATA_FILE" | tail | cut -d : -f1,4- | sed 's/:/ | /1;s/~/ | /'
     ;;
-"recentcomment" | "rc" )
- # silly sed does not respect tab or newline, gsed does. So I went through some hoops to indent comment
-    grep ':com:' ext.txt | tail | cut -d : -f1,3- | sed 's/:/ | /1;s/~/ | /' | sed "s//   /g;" | tr '' '\n'
+"recentcomment" | "rc" ) # COMMAND: list recent comments 
+    # TODO, we should show the title too , somehow
+    # silly sed does not respect tab or newline, gsed does. So I went through some hoops to indent comment
+    grep ':com:' "$EXTRA_DATA_FILE"| tail | cut -d : -f1,3- | sed 's/:/ | /1;s/~/ | /' | sed "s//   /g;" | tr '' '\n'
     ;;
 "help" )
     help
