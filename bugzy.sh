@@ -630,10 +630,10 @@ change_status()
         tsv_set_column_value $item $reply $newcode
         echo "$item is now $newcode ($input)"
         #log_changes $reply "$oldvalue" $newcode $file
-        log_changes1 $reply "#$item $input on $TSV_NOW"
+        log_changes1 $reply "#$item $input"
         #mtitle=`get_title $item`
         mtitle=`tsv_get_title $item`
-        [ ! -z "$EMAIL_TO" ] && echo "$item changed from $oldvalue to $newcode" | mail -s "[$var] $mtitle" $EMAIL_TO
+        [ ! -z "$EMAIL_TO" ] && echo "#$item changed from $oldvalue to $newcode" | mail -s "[$var] $mtitle" $EMAIL_TO
         #show_diffs 
 }
 ## for actions that require a bug id
@@ -1675,8 +1675,6 @@ done # while true
     cleanup
         ;;
 
-        # TODO allow multiple items ? take mpri from todo
-        # TODO should log change
 "pri" ) # COMMAND: give priority to a task, appears in title and colored and sorted in some reports
 
     errmsg="usage: $TODO_SH $action ITEM# PRIORITY
@@ -1692,7 +1690,7 @@ note: PRIORITY must be anywhere from A to Z."
         oldvalue=$( tsv_get_column_value $item "title" )
         newvalue=$( echo "$oldvalue" | sed  -e "s/^([A-Z]) //" -e  "s/^/($newpri) /" )
         tsv_set_column_value $item "title" "$newvalue"
-        # praps better to search title and replace 
+        log_changes1 $reply "#$item priority set to $newcode"
         [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed  -i.bak -e "/^title: /s/(.)//" -e  "s/^\(title: \)/\1($newpri) /" $file
         cleanup
         ;;
@@ -1704,6 +1702,7 @@ note: PRIORITY must be anywhere from A to Z."
         oldvalue=$( tsv_get_column_value $item "title" )
         newvalue=$( echo "$oldvalue" | sed  -e "s/^(.) //" )
         tsv_set_column_value $item "title" "$newvalue"
+        log_changes1 $reply "#$item priority removed"
         [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed  -i.bak -e "/^title: /s/(.)//" $file
         #show_diffs 
         cleanup
@@ -1968,7 +1967,9 @@ done
             for item in "$@"
             do
                 common_validation $item "$errmsg"
+                ## CAUTION: we are adding to end of row, so if new column is added XXX
                 sed -i.bak "/^$paditem/s/.*/& $tag/" "$TSV_FILE"
+                log_changes1 $reply "#$item tagged with $tag"
                 [ "$?" -eq 0 ] && echo "Tagged $item with $tag";
             done
             cleanup
