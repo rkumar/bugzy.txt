@@ -1,19 +1,14 @@
 BUGZY.TXT Command Line Bug Tracker
 ==================================
 
-A simple (and not yet extensible) shell script for managing
+A simple, extensible shell script (bash) for managing
 bugs/features/enhancements and tasks.
 
-Bugs have a unique persistent serial number. I have moved from a single
-issue per file (key: value) format, to a tab separated single file
-format. The earlier file format is still created and updated till I
-decide whether to knock it off altogether.
+Maintains title, description, create_date, due_date, severity, type,
+priority, assigned to, multiple comments, fix/resolution, various statuses.
 
+All modifications are logged.
 Mails are sent using the 'mail' command if specified.
-
-I have moved to a tab separated format from key:value flat file.
-however, the old files are still created i have not yet removed them,
-since someone may like it that way.
 
 Downloads
 ---------
@@ -27,7 +22,7 @@ User Documentation
 
 1. Download the latest release from <http://github.com/rkumar/bugzy.txt/downloads>
 
-2. Edit the bugzy.cfg and update the TODO_DIR to whereever your bug files should be created.
+2. Edit the bugzy.cfg and update the TSV_DIR to whereever your bug files should be created.
 
 3. Make the bugzy.sh file executable, and place it in your PATH.
 
@@ -40,6 +35,7 @@ User Documentation
 
 The bug files are created in a directory ".todos" inside TODO_DIR.
 
+Add-ons may be placed in $HOME/.bugzy.actions.d (default).
 
 ### Dependencies
 
@@ -101,6 +97,12 @@ The above example relies on shell expansion, if supported by your shell.
 
 "fix" item#    # add a fix or resolution
 
+"recentcomment" | "rc"  # view recent comments
+"recentlog" | "rl"      # view recent logs
+
+"delcomment" item# comment#            # delete comment from an item
+
+Add-ons include `mdel`, `mpri`, `mdepri`.
 
 TO ADD MORE HERE.
 
@@ -112,7 +114,7 @@ You may also alias bugzy to "b" in ~/.bashrc or equivalent.
     > b list  
     > b mod 1  
     > b start 1  
-    > b close 1  
+    > b close --comment:"some optional comment comes here" 1  
     > b show  
     > b add "Module bbb crashes on startup"  
     > b pri 2 A  
@@ -126,6 +128,8 @@ You may also alias bugzy to "b" in ~/.bashrc or equivalent.
     > b grep @URG
     > b liststat OPE
     > b newest 5
+    > b recentlog
+    > b recentcomment
 
     > b -h
     > b help
@@ -138,4 +142,5 @@ Others
 - Uses the excellent [todo.txt shell script](http://github.com/ginatrapani/todo.txt-cli) as a base.
 
 - Original anaemic release by rkumar on 2009-11-08.
+
 /* vim: set tw=72: */
