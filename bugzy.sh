@@ -15,28 +15,28 @@
 #### --- cleanup code use at start ---- ####
 TMP_FILE=${TMPDIR:-/tmp}/prog.$$
 trap "rm -f $TMP_FILE.?; exit 1" 0 1 2 3 13 15
-PROGNAME=$(basename "$0")
-TODO_SH=$PROGNAME
+TSV_PROGNAME=$(basename "$0")
+TODO_SH=$TSV_PROGNAME
 #TODO_DIR="/Users/rahul/work/projects/rbcurse"
-export PROGNAME
+export TSV_PROGNAME
 Date="2009-11-16"
-DATE_FORMAT='+%Y-%m-%d %H:%M'
-DUE_DATE_FORMAT='+%Y-%m-%d'
+TSV_DATE_FORMAT='+%Y-%m-%d %H:%M'
+TSV_DUE_DATE_FORMAT='+%Y-%m-%d'
 arg0=$(basename "$0")
 
 TSV_FILE="data.tsv"
-EXTRA_DATA_FILE="ext.txt"
-ARCHIVE_FILE="archive.txt"
+TSV_EXTRA_DATA_FILE="ext.txt"
+TSV_ARCHIVE_FILE="archive.txt"
 #TSV_TITLES_FILE="titles.tsv"
 # what fields are we to prompt for in mod
-EDITFIELDS="title description status severity type assigned_to due_date comment fix"
-PRINTFIELDS="title id status severity type assigned_to date_created due_date"
+TSV_EDITFIELDS="title description status severity type assigned_to due_date comment fix"
+TSV_PRINTFIELDS="title id status severity type assigned_to date_created due_date"
 TSV_PRETTY_PRINT=1
 # should desc and comments be printed in "list" command
 TSV_PRINT_DETAILS=0
 TSV_OUTPUT_DELIMITER=" | "
-TSV_NOW=`date "$DATE_FORMAT"`
-TSV_NOW_SHORT=`date "$DUE_DATE_FORMAT"`
+TSV_NOW=`date "$TSV_DATE_FORMAT"`
+TSV_NOW_SHORT=`date "$TSV_DUE_DATE_FORMAT"`
 # input delimiter or IFS
 export DELIM=$'\t'
 export TSV_TITLE_OFFSET1=57 # with id - DONT USE
@@ -45,18 +45,18 @@ export TSV_TITLE_COLUMN=8
 #export TSV_TITLE_OFFSET2=63 # without the id
 TSV_CREATE_FLAT_FILE=0
 TSV_WRITE_FLAT_FILE=0
-TODOTXT_FORCE=0
+TSV_TXT_FORCE=0
 TSV_ADD_COMMENT_COUNT_TO_TITLE=1
 #ext=${1:-"default value"}
 #today=$(date +"%Y-%m-%d-%H%M")
 
-#PROG_DEFAULT_ACTION="list" # this should be in a CFG file not here.
-oneline_usage="$PROGNAME [-fhpantvV] [-d todo_config] action [task_number] [task_description]"
+#TSV_DEFAULT_ACTION="list" # this should be in a CFG file not here.
+oneline_usage="$TSV_PROGNAME [-fhpantvV] [-d todo_config] action [task_number] [task_description]"
 usage()
 {   
     sed -e 's/^    //' <<EndUsage
     Usage: $oneline_usage
-    Try '$PROGNAME -h' for more information.
+    Try '$TSV_PROGNAME -h' for more information.
 EndUsage
     exit 1
 }
@@ -500,14 +500,14 @@ log_changes()
     local newline=$3
     local file=$4
     local dlim="~"
-    #local now=`date "$DATE_FORMAT"`
+    #local now=`date "$TSV_DATE_FORMAT"`
     [ -z "$key" ] && die "key blank"
     [ -z "$oldvalue" ] && die "oldvalue blank"
     [ -z "$newline" ] && die "newline blank"
     #[ -z "$file" ] && die "flat file name blank"
     data="- LOG${dlim}$TSV_NOW${dlim}$key${dlim}$oldvalue${dlim}$newline"
     # combined file, log in another file ?
-    echo "$item:log:$data" >> "$EXTRA_DATA_FILE"
+    echo "$item:log:$data" >> "$TSV_EXTRA_DATA_FILE"
     [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && echo "$data" >> $file
 
 }
@@ -519,7 +519,7 @@ log_changes1()
     #local newline=$3
     #local file=$4
     local dlim="~"
-    TSV_NOW=`date "$DATE_FORMAT"`
+    TSV_NOW=`date "$TSV_DATE_FORMAT"`
     [ -z "$key" ] && die "key blank"
     #[ -z "$oldvalue" ] && die "oldvalue blank"
     #[ -z "$newline" ] && die "newline blank"
@@ -527,7 +527,7 @@ log_changes1()
     #data="- LOG${dlim}$TSV_NOW${dlim}$key${dlim}$oldvalue${dlim}$newline"
     data=$( echo -en "$logtext" | tr '\n' ' ')
     # combined file, log in another file ?
-    echo "$item:log:$key:$TSV_NOW${dlim}$data" >> "$EXTRA_DATA_FILE"
+    echo "$item:log:$key:$TSV_NOW${dlim}$data" >> "$TSV_EXTRA_DATA_FILE"
     [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && echo "$data" >> $file
 
 }
@@ -579,8 +579,8 @@ convert_due_date()
    if [ ${input:0:1} == '+' ];
    then
        input=${input:1}
-       result=$(date --date "$input" "$DUE_DATE_FORMAT")
-       result=$(date_calc "$input" "$DUE_DATE_FORMAT")
+       result=$(date --date "$input" "$TSV_DUE_DATE_FORMAT")
+       result=$(date_calc "$input" "$TSV_DUE_DATE_FORMAT")
    else
        result=$input
    fi
@@ -626,7 +626,7 @@ change_status()
 {
     item=$1
     action=$2
-    errmsg="usage: $TODO_SH $action task#"
+    errmsg="usage: $TSV_PROGNAME $action task#"
     common_validation $1 "$errmsg"
     reply="status"; input="$action";
     oldvalue=`tsv_get_column_value $item $reply`
@@ -637,7 +637,7 @@ change_status()
     echo "$item is currently $oldvalue ($oldvaluelong)"
         newcode=`convert_long_to_short_code $input`
         newline="$reply: $newcode"
-        #now=`date "$DATE_FORMAT"`
+        #now=`date "$TSV_DATE_FORMAT"`
         [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
         # tsv stuff
         newcode=`convert_long_to_short_code $input`
@@ -717,7 +717,7 @@ add_ml_comment(){
                     # for tsv file
                     pretext="$item:com:$pretext"
                     # C-a processing, adding
-                    echo "${pretext}$loginput" >> "$EXTRA_DATA_FILE"  # this has control A's, so we can pull one line and subst ^A with nl.
+                    echo "${pretext}$loginput" >> "$TSV_EXTRA_DATA_FILE"  # this has control A's, so we can pull one line and subst ^A with nl.
 [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && {
 pretext="- $TSV_NOW: "
 text=$( echo "$input" | sed "1s/^/$pretext/g" | sed '2,$s/^/                    \>/g' )
@@ -737,7 +737,7 @@ x
 }
 } # add_ml
 add_comment_count_to_title(){
-    count=$( grep -c "^$item:com:" "$EXTRA_DATA_FILE" )
+    count=$( grep -c "^$item:com:" "$TSV_EXTRA_DATA_FILE" )
     # tsv stuff
     oldvalue=$( tsv_get_column_value $item "title" )
     newvalue=$( echo "$oldvalue" | sed  -e "s/ ([0-9]*)$//" -e  "s/$/ ($count)/" )
@@ -908,8 +908,8 @@ tsv_delete_other_files(){
     RESULT=0
 
     # delete files from here
-    grep "^$item:" "$EXTRA_DATA_FILE" >> deleted.extra.txt
-    sed -i.bak "/^$item:/d" "$EXTRA_DATA_FILE"
+    grep "^$item:" "$TSV_EXTRA_DATA_FILE" >> deleted.extra.txt
+    sed -i.bak "/^$item:/d" "$TSV_EXTRA_DATA_FILE"
     return $?
 }
 ## updates tsv row with data for given
@@ -982,7 +982,7 @@ print_item(){
     item=$1
     rowdata=`tsv_get_rowdata $item`
     output=""
-    for field in $( echo $PRINTFIELDS )
+    for field in $( echo $TSV_PRINTFIELDS )
     do
         index=`tsv_column_index "$field"`
         value=$( echo "$rowdata" | cut -d $'\t' -f $index )
@@ -1012,7 +1012,7 @@ print_item(){
         done
     echo -e "$output"
     #echo "index:$index"
-    #paste  <(echo $PRINTFIELDS | tr ' ' '\n') <(echo "$rowdata" | tr '\t' '\n')
+    #paste  <(echo $TSV_PRINTFIELDS | tr ' ' '\n') <(echo "$rowdata" | tr '\t' '\n')
 }
 ## given a date, calculates how much time from now (upcoming or overdue)
 ## If overdue, then says overdue.
@@ -1088,7 +1088,7 @@ get_extra_data(){
     # tsv stuff
     # combined file approach
     regex="^$item:${reply:0:3}" 
-    description=$( grep "^$item:${reply:0:3}" "$EXTRA_DATA_FILE"  | cut -d: -f3- )
+    description=$( grep "^$item:${reply:0:3}" "$TSV_EXTRA_DATA_FILE"  | cut -d: -f3- )
     if [ ! -z "$description" ]; then
         if [ $reply == "log" ]; then
             echo "$description" | sed 's/^[^:]*:/On /;s/~/, /1;' |  tr '' ' '
@@ -1107,8 +1107,8 @@ update_extra_data(){
     local text="$3"
     text=$( echo "$text" | tr '\n' '' )
     i_desc_pref=$( echo "$text" | sed "s/^/$item:${reply:0:3}:/g" )
-    sed -i.bak "/^$item:${reply:0:3}:/d" "$EXTRA_DATA_FILE"
-    echo "$i_desc_pref" >> "$EXTRA_DATA_FILE"
+    sed -i.bak "/^$item:${reply:0:3}:/d" "$TSV_EXTRA_DATA_FILE"
+    echo "$i_desc_pref" >> "$TSV_EXTRA_DATA_FILE"
 }
 
 ## colors data passed in based on priority
@@ -1187,8 +1187,8 @@ create_tsv_file()
       # combined file approach
       [ ! -z "$i_desc" ] && {
           i_desc_pref=$( echo "$i_desc" | sed "s/^/$serialid:des:/g" )
-          #echo "$serialid:des:$i_desc" >> "$EXTRA_DATA_FILE"
-          echo "$i_desc_pref" >> "$EXTRA_DATA_FILE"
+          #echo "$serialid:des:$i_desc" >> "$TSV_EXTRA_DATA_FILE"
+          echo "$i_desc_pref" >> "$TSV_EXTRA_DATA_FILE"
       }
       [ "$TSV_CREATE_FLAT_FILE" -gt 0 ] && create_flat_file
 }
@@ -1266,13 +1266,13 @@ do
         ;;
         (f) file="$OPTARG";;
         p )
-        TODOTXT_PLAIN=1
+        TSV_PLAIN=1
         ;;
         (o) out="$OPTARG";;
         (D) Dflag="$Dflag $OPTARG";;
         (l) TSV_PRINT_DETAILS=1;; # print desc and comments withing "list"
         d )
-        PROG_CFG_FILE=$OPTARG
+        TSV_CFG_FILE=$OPTARG
         ;;
         (i) 
         ;;
@@ -1283,7 +1283,11 @@ shift $(($OPTIND - 1))
 
 # defaults if not yet defined
 VERBOSE_FLAG=${VERBOSE_FLAG:-1}
-TODOTXT_PLAIN=${TODOTXT_PLAIN:-0}
+TSV_PLAIN=${TSV_PLAIN:-0}
+
+# Export all TSV_* variables
+export ${!TSV__@}
+
 export NONE=''
 export BLACK='\\033[0;30m'
 export RED='\\033[0;31m'
@@ -1309,9 +1313,9 @@ export PRI_B=$GREEN         # color for B priority
 export PRI_C=$CYAN    # color for C priority
 export PRI_X=$WHITE         # color for rest of them
 # OLD flat file
-TODOTXT_SORT_COMMAND=${TODOTXT_SORT_COMMAND:-env LC_COLLATE=C sort -f -k3}
+TSV_SORT_COMMAND=${TSV_SORT_COMMAND:-env LC_COLLATE=C sort -f -k3}
 # for tsv (list cannot use tsv_titles since FILELIST is not used
-#TODOTXT_SORT_COMMAND=${TODOTXT_SORT_COMMAND:-env LC_COLLATE=C sort -f -k2}
+#TSV_SORT_COMMAND=${TSV_SORT_COMMAND:-env LC_COLLATE=C sort -f -k2}
 TSV_SORT_COMMAND=${TSV_SORT_COMMAND:-"env LC_COLLATE=C sort -t$'\t' -k7 -r"}
 REG_ID="^...."
 REG_STATUS="..."
@@ -1322,19 +1326,19 @@ REG_DATE_CREATED=".\{16\}"
 REG_ASSIGNED_TO=".\{10\}"
 
 
-[ -r "$PROG_CFG_FILE" ] || die "Fatal error: Cannot read configuration file $PROG_CFG_FILE"
+[ -r "$TSV_CFG_FILE" ] || die "Fatal error: Cannot read configuration file $TSV_CFG_FILE"
 
-. "$PROG_CFG_FILE"
+. "$TSV_CFG_FILE"
 
-ACTION=${1:-$PROG_DEFAULT_ACTION}
+ACTION=${1:-$TSV_DEFAULT_ACTION}
 
 [ -z "$ACTION" ]    && usage
 # added RK 2009-11-06 11:00 to save issues (see edit)
-ISSUES_DIR=$TODO_DIR/.todos
+ISSUES_DIR=$TSV_DIR/.todos
 DELETED_DIR="$ISSUES_DIR/deleted"
 TSV_FILE_DELETED="$DELETED_DIR/deleted.tsv"
 
-if [ $TODOTXT_PLAIN = 1 ]; then
+if [ $TSV_PLAIN = 1 ]; then
     PRI_A=$NONE
     PRI_B=$NONE
     PRI_C=$NONE
@@ -1435,11 +1439,11 @@ case $action in
 
        # TODO allow multiple items ?
 "del" | "rm") # COMMAND: delete an item
-    errmsg="usage: $TODO_SH $action task#"
+    errmsg="usage: $TSV_PROGNAME $action task#"
     item=$1
     common_validation $1 $errmsg
     mtitle=`tsv_get_title $item`
-            if  [ $TODOTXT_FORCE = 0 ]; then
+            if  [ $TSV_TXT_FORCE = 0 ]; then
                 echo "Delete '$mtitle'?  (y/n)"
                 read ANSWER
             else
@@ -1461,13 +1465,13 @@ case $action in
 
 
 "modify" | "mod") # COMMAND: modify fields of an item
-    errmsg="usage: $TODO_SH $action task#"
+    errmsg="usage: $TSV_PROGNAME $action task#"
     modified=0
     item=$1
     common_validation $1 $errmsg
     mtitle=`tsv_get_title $item`
     echo "Modifying item titled '$mtitle'"
-    MAINCHOICES="$EDITFIELDS"
+    MAINCHOICES="$TSV_EDITFIELDS"
     while true
     do
         CHOICES="$MAINCHOICES"
@@ -1497,7 +1501,7 @@ case $action in
         newcode=`convert_long_to_short_code $input` # not required now since its new code
         echo "input is $longcode ($newcode)"
         newline="$reply: $newcode" # for FLAT file
-        TSV_NOW=`date "$DATE_FORMAT"`
+        TSV_NOW=`date "$TSV_DATE_FORMAT"`
         [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
         tsv_set_column_value $item $reply $newcode
         #log_changes $reply $oldvalue $newcode $file
@@ -1598,7 +1602,7 @@ done # while true
 
 "liststat" | "lists" ) #COMMAND: lists items for a given status 
     valid="|OPE|CLO|STA|STO|CAN|"
-    errmsg="usage: $TODO_SH $action $valid"
+    errmsg="usage: $TSV_PROGNAME $action $valid"
     status=$1
     [ -z "$status" ] && die "$errmsg"
     status=$( printf "%s\n" "$status" | tr 'a-z' 'A-Z' )
@@ -1622,7 +1626,7 @@ done # while true
 
 "selectm" | "selm") # COMMAND: allows multiple criteria selection key value
     valid="|status|date_created|severity|type|"
-    errmsg="usage: $TODO_SH $action \"type: BUG\" \"status: OPE\" ..."
+    errmsg="usage: $TSV_PROGNAME $action \"type: BUG\" \"status: OPE\" ..."
     [ -z "$1" ] && die "$errmsg"
 
     # if you use grep -P then don't escape {
@@ -1703,7 +1707,7 @@ done # while true
 
 "pri" ) # COMMAND: give priority to a task, appears in title and colored and sorted in some reports
 
-    errmsg="usage: $TODO_SH $action ITEM# PRIORITY
+    errmsg="usage: $TSV_PROGNAME $action ITEM# PRIORITY
 note: PRIORITY must be anywhere from A to Z."
 
     [ "$#" -ne 2 ] && die "$errmsg"
@@ -1722,7 +1726,7 @@ note: PRIORITY must be anywhere from A to Z."
         ;;
 "depri" | "dp" ) # COMMAND: removes priority of task
         # TODO should log change
-        errmsg="usage: $TODO_SH $action ITEM#"
+        errmsg="usage: $TSV_PROGNAME $action ITEM#"
         common_validation $1 $errmsg 
         # tsv stuff
         oldvalue=$( tsv_get_column_value $item "title" )
@@ -1745,7 +1749,7 @@ do
         break
     fi
     item=$1
-    $TODO_SH  -d "$PROG_CFG_FILE" pri $item $newpri
+    $TSV_PROGNAME  -d "$TSV_CFG_FILE" pri $item $newpri
     shift
 done
 ;;
@@ -1757,7 +1761,7 @@ do
         break
     fi
     item=$1
-    $TODO_SH -d "$PROG_CFG_FILE" del $item
+    $TSV_PROGNAME -d "$TSV_CFG_FILE" del $item
     shift
 done
 ;;
@@ -1769,13 +1773,13 @@ do
         break
     fi
     item=$1
-    $TODO_SH  -d "$PROG_CFG_FILE" depri $item
+    $TSV_PROGNAME  -d "$TSV_CFG_FILE" depri $item
     shift
 done
 ;;
 
 "show" ) # COMMAND: shows an item, defaults to last
-        errmsg="usage: $TODO_SH show ITEM#"
+        errmsg="usage: $TSV_PROGNAME show ITEM#"
         item=$1
         [ -z "$1" ] && {
             item=$( sed '$!d' "$TSV_FILE" | cut -f1 | sed 's/ *//g' )
@@ -1839,7 +1843,7 @@ done
 
         ;;
 "viewlog" | "viewcomment" ) # COMMAND: view comments for an item
-        errmsg="usage: $TODO_SH $action ITEM#"
+        errmsg="usage: $TSV_PROGNAME $action ITEM#"
         common_validation $1 $errmsg 
         field=${action:4}
         data=$( get_extra_data $item $field )
@@ -1849,7 +1853,7 @@ done
 
         # user may want to add one comment to many items
 "comment" | "addcomment" ) # COMMAND: to add a comment to an item
-        errmsg="usage: $TODO_SH $action ITEM#"
+        errmsg="usage: $TSV_PROGNAME $action ITEM#"
         common_validation $1 $errmsg 
         reply="comment"
 
@@ -1913,10 +1917,10 @@ done
                     echo "Your regex is not working on sed. $sedfound items instead of $count"
                     exit 1
                 fi
-                grep   "$regex" "$TSV_FILE" >> "$ARCHIVE_FILE"
+                grep   "$regex" "$TSV_FILE" >> "$TSV_ARCHIVE_FILE"
                 # DARN sed wont take perl expressions
                 sed -i.bak "/$regex/d" "$TSV_FILE"
-                echo "$count row/s archived to $ARCHIVE_FILE";
+                echo "$count row/s archived to $TSV_ARCHIVE_FILE";
                 echo "cleaning other/older files: $toarch"
                 [ ! -d "archived" ] && mkdir archived;
                 #for f in $toarch
@@ -1990,7 +1994,7 @@ done
 "tag" ) # COMMAND: adds a tag at end of title, with '@' prefixed, helps in searching.
  # TODO XXX tag added after comment !!!
             tag="@$1"
-            errmsg="usage: $TODO_SH $action TAG ITEM#"
+            errmsg="usage: $TSV_PROGNAME $action TAG ITEM#"
             [ -z "$1" ] && die "Tag required. $errmsg"
             shift
             [ $# -eq 0 ] && die "Item/s required. $errmsg"
@@ -2007,7 +2011,7 @@ done
 
             # what if one fix to be attached to several bugs ?
 "fix" | "addfix" ) # COMMAND: add a fix / resolution for given item
-        errmsg="usage: $TODO_SH $action ITEM#"
+        errmsg="usage: $TSV_PROGNAME $action ITEM#"
         common_validation $1 $errmsg 
         tsv_get_title $item
         echo "Enter a fix or resolution for $item"
@@ -2017,10 +2021,10 @@ done
 
         ;;
 "status" ) # COMMAND: prints completion status of bugs, features, enhancements, tasks
-        bugarch=$(grep -c BUG "$ARCHIVE_FILE" )
-        enharch=$(grep -c ENH "$ARCHIVE_FILE" )
-        feaarch=$(grep -c FEA "$ARCHIVE_FILE" )
-        tasarch=$(grep -c TAS "$ARCHIVE_FILE" )
+        bugarch=$(grep -c BUG "$TSV_ARCHIVE_FILE" )
+        enharch=$(grep -c ENH "$TSV_ARCHIVE_FILE" )
+        feaarch=$(grep -c FEA "$TSV_ARCHIVE_FILE" )
+        tasarch=$(grep -c TAS "$TSV_ARCHIVE_FILE" )
         bugctr=$bugarch
         bugclo=$bugarch
         feactr=$feaarch
@@ -2099,15 +2103,16 @@ done
 ;;
 "recentlog" | "rl") # COMMAND: list recent logs
     # TODO, we should show the title too , somehow
-    grep ':log:' "$EXTRA_DATA_FILE" | tail | cut -d : -f1,4- | sed 's/:/ | /1;s/~/ | /'
+    grep ':log:' "$TSV_EXTRA_DATA_FILE" | tail | cut -d : -f1,4- | sed 's/:/ | /1;s/~/ | /'
     ;;
 "recentcomment" | "rc" ) # COMMAND: list recent comments 
     # TODO, we should show the title too , somehow
     # silly sed does not respect tab or newline, gsed does. So I went through some hoops to indent comment
-    grep ':com:' "$EXTRA_DATA_FILE"| tail | cut -d : -f1,3- | sed 's/:/ | /1;s/~/ | /' | sed "s//   /g;" | tr '' '\n'
+    grep ':com:' "$TSV_EXTRA_DATA_FILE"| tail | cut -d : -f1,3- | sed 's/:/ | /1;s/~/ | /' | sed "s//   /g;" | tr '' '\n'
     ;;
 "delcomment" ) # COMMAND: delete a given comment from an item
-    errmsg="usage: $TODO_SH $action item# comment#"
+# TODO update comment count in title UGH
+    errmsg="usage: $TSV_PROGNAME $action item# comment#"
     item=$1
     [ -z "$item" ] && die "Item number required. $errmsg"
     number=$2
@@ -2115,22 +2120,22 @@ done
     [ "$number" -lt 1 ] && die "Comment number should be 1 or more. $errmsg"
     unumber=$number
     number=$(( $number-1 ))
-    OLDIFS="$IFS"; IFS=$'\n';declare -a comments=( $(grep "^${item}:com" ext.txt) );IFS="$OLDIFS"
+    OLDIFS="$IFS"; IFS=$'\n';declare -a comments=( $(grep "^${item}:com" "$TSV_EXTRA_DATA_FILE") );IFS="$OLDIFS"
     row=${comments[$number]}
     [ -z "$row" ] && die "No such comment. Highest is ${#comments[@]}"
     echo -e "\nThe comment is:\n"
     frow=$( echo -e "$row" | cut -d : -f3- | tr '' '\n' | sed '2,$s/^/    /' )
     echo -e "$frow"
     short_row=$( echo "${frow:0:50}" | tr '\n' ' ' )
-    #sed "/$row/!d" ext.txt
-    if  [ $TODOTXT_FORCE = 0 ]; then
+    #sed "/$row/!d" "$TSV_EXTRA_DATA_FILE"
+    if  [ $TSV_TXT_FORCE = 0 ]; then
         echo "Delete '$short_row'?  (y/n)"
         read ANSWER
     else
         ANSWER="y"
     fi
     if [ "$ANSWER" = "y" ]; then
-        sed -i.bak "/$row/d" ext.txt
+        sed -i.bak "/$row/d" "$TSV_EXTRA_DATA_FILE"
         [ $VERBOSE_FLAG -gt 0 ] && echo "Bugzy: '$short_row' deleted."
         [ ! -z "$EMAIL_TO" ] && echo -e "$frow" | mail -s "[DELCOMM] $item ($unumber) $short_row" $EMAIL_TO
         cleanup
