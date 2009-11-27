@@ -825,9 +825,29 @@ get_next_id(){
 tsv_column_index(){
     [ $# -ne 1 ] && { echo "===== tsv_column_index ERROR one param required"; }
     # put in hash or function to make faster
-    local titles=$( tsv_headers | tr '\t' ' ' )
-    echo `get_word_position "$1" "$titles"`
+    [ -z "$titles_arr" ] &&  titles_arr=( $( tsv_headers | tr '\t' ' ' ) )
+
+    #echo `get_word_position "$1" "$titles"`
+    echo $(indexOf $1  "${titles_arr[@]}" )
 }
+indexOf() {
+   local pattern=$1
+   local index list
+   shift
+
+   list=("$@")
+   for index in "${!list[@]}"
+   do
+       [[ ${list[index]} = $pattern ]] && {
+           echo $index
+           return 0
+       }
+   done
+
+   echo -1
+   return 1
+}
+
 # given a string space delimited, returns which position that word is.
 # starts with 1, in "aa bb cc dd" aa is 1, bb is 2, cc 3
 # typically to use with cut which has base 1
@@ -993,14 +1013,22 @@ convert_short_to_long_code(){
 print_item(){
     item=$1
     rowdata=`tsv_get_rowdata $item`
+    ## create an array
+    OLDIFS="$IFS"
+    IFS=$'\t'
+    rowarr=( $(echo "$rowdata" ) )
+
+    IFS="$OLDIFS"
     output=""
     for field in $( echo $TSV_PRINTFIELDS )
     do
         index=`tsv_column_index "$field"`
-        value=$( echo "$rowdata" | cut -d $'\t' -f $index )
+        #value=$( echo "$rowdata" | cut -d $'\t' -f $index )
+        #index=$(( index - 1 ))
+        value="${rowarr[$index]}"
         xxfile=$( printf "%-13s" "$field" )
-        row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
-        #row=$( echo -e "$xxfile: " )
+        #row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
+        row=$( echo -e "$xxfile: " )
         output+=$( echo -en "\n$row" )
         output+=$( echo "$value" )
     done
@@ -1755,7 +1783,7 @@ note: PRIORITY must be anywhere from A to Z."
         oldvalue=$( tsv_get_column_value $item "title" )
         newvalue=$( echo "$oldvalue" | sed  -e "s/^([A-Z]) //" -e  "s/^/($newpri) /" )
         tsv_set_column_value $item "title" "$newvalue"
-        log_changes1 $reply "#$item priority set to $newcode"
+        log_changes1 "priority" "#$item priority set to $newvalue"
         [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed  -i.bak -e "/^title: /s/(.)//" -e  "s/^\(title: \)/\1($newpri) /" $file
         cleanup
         ;;
@@ -1767,7 +1795,7 @@ note: PRIORITY must be anywhere from A to Z."
         oldvalue=$( tsv_get_column_value $item "title" )
         newvalue=$( echo "$oldvalue" | sed  -e "s/^(.) //" )
         tsv_set_column_value $item "title" "$newvalue"
-        log_changes1 $reply "#$item priority removed"
+        log_changes1 "priority" "#$item priority removed"
         [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed  -i.bak -e "/^title: /s/(.)//" $file
         #show_diffs 
         cleanup
@@ -1999,7 +2027,7 @@ note: PRIORITY must be anywhere from A to Z."
                 common_validation $item "$errmsg"
                 ## CAUTION: we are adding to end of row, so if new column is added XXX
                 sed -i.bak "/^$paditem/s/.*/& $tag/" "$TSV_FILE"
-                log_changes1 $reply "#$item tagged with $tag"
+                log_changes1 "tag" "#$item tagged with $tag"
                 [ "$?" -eq 0 ] && echo "Tagged $item with $tag";
             done
             cleanup
