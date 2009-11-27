@@ -1,0 +1,21 @@
+#!/bin/bash
+
+action=$1
+shift
+
+[ "$action" = "usage" -o $# -lt 1 ] && {
+  echo "    mdel item# item# ..."
+  echo "    delete multiple items"
+  echo "        mdel 101 102 103"
+  echo ""
+  exit
+}
+while true
+do
+    if [[ -z "$1" ]]; then
+        break
+    fi
+    item=$1
+    $TSV_PROGNAME -d "$TSV_CFG_FILE" del $item
+    shift
+done

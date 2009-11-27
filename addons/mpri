@@ -1,0 +1,25 @@
+#!/bin/bash
+
+action=$1
+shift
+
+[ "$action" = "usage" -o $# -lt 2 ] && {
+  echo "    mpri [A-Z] item# item# ..."
+  echo "    set priority to multiple items"
+  echo "        mpri Z 101 102 103"
+  echo ""
+  exit
+}
+## t mpri Z 1 2 3 4
+newpri=$1
+shift
+while true
+do
+    if [[ -z "$1" ]]; then
+        break
+    fi
+    item=$1
+    $TSV_PROGNAME  -d "$TSV_CFG_FILE" pri $item $newpri
+    shift
+done
+
