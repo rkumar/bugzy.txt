@@ -627,9 +627,14 @@ process_quadoptions()
     esac
 }
 # returns title for an item/task NEW TSV file
+# just be careful that we  could change title and then show old value
 tsv_get_title()
 {
     item=${1:-$item}
+    [ -z "$modified" -a  -z "$G_TITLE" -a $item == $saved_item ] && {
+        echo "$G_TITLE"
+        return 0
+    }
     local mtitle=`tsv_get_rowdata $item | cut -f$TSV_TITLE_COLUMN `
     echo "$mtitle"
 }
@@ -667,10 +672,12 @@ change_status()
 }
 ## for actions that require a bug id
 ## sets item, file
+## sets rowdata and lineno by calling tsv_get_rowdata...
 ## TODO set title and lineno in one shot, so we don't keep checking for it, maybe even other fields
 common_validation()
 {
     item=$1
+    saved_item=$item
     # added paditem, so we don't need to keep doing it. 2009-11-20 19:37 
     paditem=$( printf "%4s" $item )
     shift
@@ -682,7 +689,13 @@ common_validation()
     #[ ! -r "$file" ] && die "No such file: $file"
 
     # tsv stuff
-    lineno=`tsv_lineno $item`
+#    lineno=`tsv_lineno $item`
+ ## sets rowdata and lineno
+    tsv_get_rowdata_with_lineno $item
+    ## creates rowarr
+    convert_row_to_array
+
+    G_TITLE=${G_ROWARR[ $(( TSV_TITLE_COLUMN-1 )) ]}
     [ $lineno -lt 1 ] && die "No such item: $item"
 #    [ $TSV_VERBOSE_FLAG -gt 0 ] && grep "^title:" $file
 }
@@ -820,15 +833,18 @@ get_next_id(){
     echo $uniqueid
 }
 ## Some tsv generic functions
-# takes fieldname, => index of column
+# takes fieldname, => index of column, starting 1 (for cut etc)
 tsv_column_index(){
     [ $# -ne 1 ] && { echo "===== tsv_column_index ERROR one param required"; }
     # put in hash or function to make faster
     [ -z "$titles_arr" ] &&  titles_arr=( $( tsv_headers | tr '\t' ' ' ) )
 
     #echo `get_word_position "$1" "$titles"`
-    echo $(indexOf $1  "${titles_arr[@]}" )
+    index=$(indexOf $1  "${titles_arr[@]}" )
+    index=$(( index+1 ))
+    echo $index
 }
+# returns index in list, starting 0
 indexOf() {
    local pattern=$1
    local index list
@@ -872,14 +888,19 @@ tsv_get_rowdata(){
     [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; return 99;}
     echo "$rowdata"
 }
+## since this function is called with $() it is run in its own shell and lineno will not be 
+## returned. Calling common_valida tion would have ppulated lineno, though
 tsv_get_rowdata_with_lineno(){
     item="$1"
     paditem=$( printf "%4s" $item )
     rowdata=$( grep -n "^$paditem" "$TSV_FILE" )
     [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; return 99;}
-    rowdata=$( cut -d':' -f2- <<< "$rowdata" )
-    lineno=$( cut -d':' -f1 <<< "$rowdata" )
-    echo "$rowdata"
+    #lineno=$( cut -d':' -f1 <<< "$rowdata" )
+    #rowdata=$( cut -d':' -f2- <<< "$rowdata" )
+    lineno=${rowdata%%:*}
+    rowdata=${rowdata#*:}
+    G_LINENO=$lineno
+    G_ROWDATA=$rowdata
 }
 
 # returns value of column for an item and fieldname
@@ -908,6 +929,7 @@ tsv_get_index_value(){
     echo "$rowdata" | cut -d $'\t' -f $index
 }
 ## given an item, returns linenumber
+## remove after deleting call from del. REDUNDANT TODO
 tsv_lineno(){
     item="$1"
     paditem=$( printf "%4s" $item )
@@ -920,9 +942,9 @@ tsv_lineno(){
 tsv_delete_item(){
     item=$1
     RESULT=0
-    lineno=`tsv_lineno $item`
     [ $lineno -lt 1 ] && { echo "No such item:$item"; RESULT=-1; return;}
-    row=$( sed "$lineno!d" "$TSV_FILE" )
+    #row=$( sed "$lineno!d" "$TSV_FILE" )
+    row="$rowdata"
     #echo "row:$row"
     [ -z "$row" ] && { echo "row blank!"; return; }
     [ ! -d "$DELETED_DIR" ] && mkdir "$DELETED_DIR";
@@ -948,15 +970,13 @@ tsv_delete_other_files(){
 # -1 on errors
 tsv_set_column_value(){
     item=$1
-    #lineno=`tsv_lineno $item`
-    #echo "line:$lineno"
     columnname=$2
     newvalue="$3"
-    row=$( tsv_get_rowdata_with_lineno $item )
-    #echo "row:$row"
+    row=$( tsv_get_rowdata $item )
+    echo "row:$row, lineno: $lineno"
     [ -z "$row" ] && { echo "row blank!"; return; }
     position=`tsv_column_index "$columnname"`
-    #echo "position:$position"
+    echo "position:$position"
     newrow=$( echo "$row" | tr '\t' '\n' | sed $position"s/.*/$newvalue/" | tr '\n' '\t' )
     res=$?
     if [ $res -ne 0 ];
@@ -968,8 +988,10 @@ tsv_set_column_value(){
     newrow=$( echo "$newrow" | sed "s/$DELIM$//" )
     # could use $o
     #var=$(echo ${var%\t})
-    #echo "newrow:$newrow"
-
+    echo "newrow:$newrow"
+    echo "lineno:$lineno"
+    [ -z "$lineno" ] && die "Lineno number, cannot update record. Pls check why."
+## CAUTION: if lineno is blank, will update / overwrite the last row !!
 ex - "$TSV_FILE"<<!
 ${lineno}c
 $newrow
@@ -1004,27 +1026,30 @@ convert_short_to_long_code(){
         ;;
     esac
 }
+convert_row_to_array(){
+    OLDIFS="$IFS"
+    IFS=$'\t'
+    G_ROWARR=( $(echo "$G_ROWDATA" ) )
+    IFS="$OLDIFS"
+}
 
 ## print out the item like it is in the file.
 # i have removed coloring of the labels since we may mail the file.
 # however the caller can color the labels.
 # echo -e "`b print 143 | sed 's/^\([^:]*\):/'$YELLOW'\1:'$DEFAULT'/g' `"
 print_item(){
-    item=$1
-    rowdata=`tsv_get_rowdata $item`
+    errmsg="usage: $TSV_PROGNAME $action task#"
+    common_validation $1 $errmsg
+    #item=$1
     ## create an array
-    OLDIFS="$IFS"
-    IFS=$'\t'
-    rowarr=( $(echo "$rowdata" ) )
-
-    IFS="$OLDIFS"
+    convert_row_to_array
     output=""
     for field in $( echo $TSV_PRINTFIELDS )
     do
         index=`tsv_column_index "$field"`
         #value=$( echo "$rowdata" | cut -d $'\t' -f $index )
-        #index=$(( index - 1 ))
-        value="${rowarr[$index]}"
+        index=$(( index - 1 ))
+        value="${G_ROWARR[$index]}"
         xxfile=$( printf "%-13s" "$field" )
         #row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
         row=$( echo -e "$xxfile: " )
@@ -1138,8 +1163,7 @@ get_extra_data(){
 }
 
 ## updates the long descriptive fields such as description, fix
-## only changes TSV file. TODO what of others
-## TODO should add C-a here, no ?
+## only changes TSV file. 
 update_extra_data(){
     item=$1
     reply=$2
@@ -1499,7 +1523,6 @@ case $action in
     echo "Created $serialid"
     cleanup;;
 
-       # TODO allow multiple items ?
 "del" | "rm") # COMMAND: delete an item
     errmsg="usage: $TSV_PROGNAME $action task#"
     item=$1
@@ -1787,7 +1810,6 @@ note: PRIORITY must be anywhere from A to Z."
         cleanup
         ;;
 "depri" | "dp" ) # COMMAND: removes priority of task
-        # TODO should log change
         errmsg="usage: $TSV_PROGNAME $action ITEM#"
         common_validation $1 $errmsg 
         # tsv stuff
@@ -1821,7 +1843,6 @@ note: PRIORITY must be anywhere from A to Z."
         done
         #paditem=$( printf "%4s" $item )
         #rowdata=$( grep "^$paditem" "$TSV_FILE" | tr '\t' '\n' )
-        rowdata=$( tsv_get_rowdata $item )
         #echo "$rowdata" | while read field
 
         # put fields into hash so we can change the order
@@ -2140,6 +2161,7 @@ note: PRIORITY must be anywhere from A to Z."
 # TODO update comment count in title UGH
     errmsg="usage: $TSV_PROGNAME $action item# comment#"
     item=$1
+    common_validation $1 $errmsg 
     [ -z "$item" ] && die "Item number required. $errmsg"
     number=$2
     [ -z "$number" ] && die "Comment number required. Use viewcomment to see comments. $errmsg"
@@ -2163,6 +2185,7 @@ note: PRIORITY must be anywhere from A to Z."
     if [ "$ANSWER" = "y" ]; then
         sed -i.bak "/$row/d" "$TSV_EXTRA_DATA_FILE"
         [ $TSV_VERBOSE_FLAG -gt 0 ] && echo "Bugzy: '$short_row' deleted."
+        [ "$TSV_ADD_COMMENT_COUNT_TO_TITLE" -gt 0 ] && add_comment_count_to_title;
         [ ! -z "$EMAIL_TO" ] && echo -e "$frow" | mail -s "[DELCOMM] $item ($unumber) $short_row" $EMAIL_TO
         cleanup
     else
