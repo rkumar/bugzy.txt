@@ -228,7 +228,19 @@ help() # COMMAND: shows help
         list recent comments
 
 EndHelp
-    exit 0
+if [ -d "$TSV_ACTIONS_DIR" ]
+then
+    echo ""
+    for action in "$TSV_ACTIONS_DIR"/*
+    do
+        if [ -x "$action" ]
+        then
+            "$action" usage
+        fi
+    done
+    echo ""
+fi
+    exit 1
 }
 die()
 {
@@ -397,10 +409,10 @@ _list()
     filter_command="${pre_filter_command:-}"
 
 
-    [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: list : $@"
+    [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: list : $@"
     for search_term in "$@"
     do
-    [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: search_term is $search_term "
+    [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: search_term is $search_term "
         ## See if the first character of $search_term is a dash
         if [ ${search_term:0:1} == '=' ]
         then
@@ -423,7 +435,7 @@ _list()
             fi
         fi
     done
-    [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: filter_command is $filter_command "
+    [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: filter_command is $filter_command "
 
     ## If post_filter_command is set, append it to the filter_command
     [ -n "$post_filter_command" ] && {
@@ -470,7 +482,7 @@ _list()
         echo -ne "$filtered_items\n"
     fi
 
-    if [ $VERBOSE_FLAG -gt 0 ]; then
+    if [ $TSV_VERBOSE_FLAG -gt 0 ]; then
         # pretty print has already shown headers
         NUMTASKS=$( echo -ne "$filtered_items" | sed -n '$ =' )
         #TOTALTASKS=$( echo -ne "$items" | sed -n '$ =' )
@@ -673,7 +685,7 @@ common_validation()
     # tsv stuff
     lineno=`tsv_lineno $item`
     [ $lineno -lt 1 ] && die "No such item: $item"
-#    [ $VERBOSE_FLAG -gt 0 ] && grep "^title:" $file
+#    [ $TSV_VERBOSE_FLAG -gt 0 ] && grep "^title:" $file
 }
 
 ## when displaying in columnar, use what widths to pad
@@ -1233,6 +1245,7 @@ getoptlong()
             #declare i_${key}=$val
             # sorry, in this case we were setting i_ vars
             read ${OPT_PREFIX}_${key} <<< $val
+            export ${OPT_PREFIX}_${key} 
             #echo " i_${key}=$val"
             ((shifted+=1))
             shift
@@ -1240,6 +1253,8 @@ getoptlong()
             break
         fi
     done
+    export long params
+    [ $shifted -gt 0 ] && export ${!opt_@}
     #what's left, if you want
     i_rest=$*
     # check shifted to see how much to shift
@@ -1262,7 +1277,7 @@ do
         (h) shorthelp;;
         (V) echo "$arg0: version @REVISION@ ($Date) Author: rkumar"; exit 0;;
         (v) 
-        : $(( VERBOSE_FLAG++ ))
+        : $(( TSV_VERBOSE_FLAG++ ))
         ;;
         (f) file="$OPTARG";;
         p )
@@ -1282,11 +1297,11 @@ done
 shift $(($OPTIND - 1))
 
 # defaults if not yet defined
-VERBOSE_FLAG=${VERBOSE_FLAG:-1}
+TSV_VERBOSE_FLAG=${TSV_VERBOSE_FLAG:-1}
 TSV_PLAIN=${TSV_PLAIN:-0}
 
 # Export all TSV_* variables
-export ${!TSV__@}
+export ${!TSV_@}
 
 export NONE=''
 export BLACK='\\033[0;30m'
@@ -1326,6 +1341,13 @@ REG_DATE_CREATED=".\{16\}"
 REG_ASSIGNED_TO=".\{10\}"
 
 
+if [ -z "$TSV_ACTIONS_DIR" -o ! -d "$TSV_ACTIONS_DIR" ]
+then
+    TSV_ACTIONS_DIR="$HOME/.bugzy.actions.d"
+    export TSV_ACTIONS_DIR
+fi
+
+
 [ -r "$TSV_CFG_FILE" ] || die "Fatal error: Cannot read configuration file $TSV_CFG_FILE"
 
 . "$TSV_CFG_FILE"
@@ -1350,12 +1372,25 @@ cd $ISSUES_DIR
 
 # == HANDLE ACTION ==
 action=$( printf "%s\n" "$ACTION" | tr 'A-Z' 'a-z' )
+if [ "$action" == command ]
+then
+    ## Get rid of "command" from arguments list
+    shift
+    ## Reset action to new first argument
+    action=$( printf "%s\n" "$1" | tr 'A-Z' 'a-z' )
+elif [ -d "$TSV_ACTIONS_DIR" -a -x "$TSV_ACTIONS_DIR/$action" ]
+then
+    "$TSV_ACTIONS_DIR/$action" "$@"
+    cleanup
+fi
 
 #action=$( printf "%s\n" "$1" | tr 'A-Z' 'a-z' )
 shift
+  # we should do this earlier so that custom progs also get these params XXX
     getoptlong "$@"
     shift $shifted
-    set | grep '^opt_'
+    # FUTURE one can check for opt_help or if --help passed and pass to another function which has detailed help
+    #set | grep '^opt_'
 case $action in
     "print" ) # COMMAND: print details of one item
     print_item $1
@@ -1455,7 +1490,7 @@ case $action in
                 # tsv stuff
                 tsv_delete_item $item
                 [ ! -z "$EMAIL_TO" ] && echo -e "$body" | mail -s "[DEL] $mtitle" $EMAIL_TO
-                [ $VERBOSE_FLAG -gt 0 ] && echo "Bugzy: '$mtitle' deleted."
+                [ $TSV_VERBOSE_FLAG -gt 0 ] && echo "Bugzy: '$mtitle' deleted."
                 cleanup
             else
                 echo "Bugzy: No tasks were deleted."
@@ -1664,7 +1699,7 @@ done # while true
     regex="^${id}${DELIM}${status}${DELIM}${severity}${DELIM}${type}${DELIM}"
     #id  status  severity        type    assigned_to     date_created    due_date        title
     [ $full_regex -gt 0 ] && regex+="${assigned_to}${DELIM}${date_created}${DELIM}${due_date}${DELIM}${title}"
-    [ $VERBOSE_FLAG -gt 1 ] && echo "regex:($regex)"
+    [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "regex:($regex)"
     #tsv_headers
     formatted_tsv_headers 
     # -P is GNU only, wont work everywhere, UGH
@@ -1738,45 +1773,6 @@ note: PRIORITY must be anywhere from A to Z."
         cleanup
         ;;
 
-        # these m ones should go as add-ons. TODO
-"mpri" | "mp" )
-## t mpri Z 1 2 3 4
-newpri=$1
-shift
-while true
-do
-    if [[ -z "$1" ]]; then
-        break
-    fi
-    item=$1
-    $TSV_PROGNAME  -d "$TSV_CFG_FILE" pri $item $newpri
-    shift
-done
-;;
-"mdel" | "mrm" )
-## t mdel 1 2 3 4
-while true
-do
-    if [[ -z "$1" ]]; then
-        break
-    fi
-    item=$1
-    $TSV_PROGNAME -d "$TSV_CFG_FILE" del $item
-    shift
-done
-;;
-"mdepri" | "mdp" )
-## t mdepri 1 2 3 4
-while true
-do
-    if [[ -z "$1" ]]; then
-        break
-    fi
-    item=$1
-    $TSV_PROGNAME  -d "$TSV_CFG_FILE" depri $item
-    shift
-done
-;;
 
 "show" ) # COMMAND: shows an item, defaults to last
         errmsg="usage: $TSV_PROGNAME show ITEM#"
@@ -1960,7 +1956,7 @@ done
 
 "grep" ) # COMMAND uses egrep to run a quick report showing status and title sorted on status
             regex="$@"
-            [ $VERBOSE_FLAG -gt 1 ] && echo "$arg0: grep : $@"
+            [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: grep : $@"
             short_title
             egrep "$@" "$TSV_FILE" | cut -f1,2,4,8  | \
             sed -e  "s/^\(....\)${DELIM}\(...\)/\2\1/" \
@@ -2136,7 +2132,7 @@ done
     fi
     if [ "$ANSWER" = "y" ]; then
         sed -i.bak "/$row/d" "$TSV_EXTRA_DATA_FILE"
-        [ $VERBOSE_FLAG -gt 0 ] && echo "Bugzy: '$short_row' deleted."
+        [ $TSV_VERBOSE_FLAG -gt 0 ] && echo "Bugzy: '$short_row' deleted."
         [ ! -z "$EMAIL_TO" ] && echo -e "$frow" | mail -s "[DELCOMM] $item ($unumber) $short_row" $EMAIL_TO
         cleanup
     else
