@@ -20,12 +20,16 @@ clean:
 	rm -f $(DISTNAME).tar.gz $(DISTNAME).zip
 
 INSTALL_DIR=~/bin
+ACTIONS_DIR=~/.bugzy.actions.d
 
 install:
-	#diff bugzy.cfg ~/bugzy.cfg
 	#[ bugzy.cgf -nt ~/bugzy.cfg ] && cp -i bugzy.cfg ~/
-	#cp -i bugzy.cfg ~/
-	cp -uv bugzy.cfg ~/
+	## updating cfg
+	cp -uvp bugzy.cfg ~/
+	## updating addons
+	cp -uvp ./addons/* $(ACTIONS_DIR)
+	chmod +x $(ACTIONS_DIR)/*
 
+	## updating bugzy
 	cp bugzy.sh $(INSTALL_DIR)/bugzy
 	chmod +x $(INSTALL_DIR)/bugzy
