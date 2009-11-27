@@ -7,8 +7,7 @@
 # 
 #
 # TODO - entry of title, check for tab and replace with spaces
-# TODO: validate fields in show
-# TODO - put col widths in hash
+# TODO - how to view archived data
 # CAUTION: we are putting priority at start of title, and tags *and* comment count at end.
 #
 
@@ -1945,15 +1944,18 @@ note: PRIORITY must be anywhere from A to Z."
                 # DARN sed wont take perl expressions
                 sed -i.bak "/$regex/d" "$TSV_FILE"
                 echo "$count row/s archived to $TSV_ARCHIVE_FILE";
-                echo "cleaning other/older files: $toarch"
-                [ ! -d "archived" ] && mkdir archived;
-                #for f in $toarch
-                #do
-                    #echo "$f"
+                echo "cleaning other/older files: ($toarch)"
+                #[ ! -d "archived" ] && mkdir archived;
+                for f in $toarch
+                do
+                    echo "$f"
+                    grep "^$f" ext.txt >> archive.ext.txt
+                    sed -i.bak "/^$f/d" "$TSV_EXTRA_DATA_FILE"
+                    #sed "/^$f/!d" "$TSV_EXTRA_DATA_FILE"
                     #[ -f "$f.txt" ] && mv "$f.txt" archived/
                     #mv $f.*.txt archived/  > /dev/null 2>&1
                     #rm $f.*bak  > /dev/null 2>&1
-                #done
+                done
             else 
                 echo "nothing to archive";
             fi
