@@ -2106,6 +2106,39 @@ done
     # silly sed does not respect tab or newline, gsed does. So I went through some hoops to indent comment
     grep ':com:' "$EXTRA_DATA_FILE"| tail | cut -d : -f1,3- | sed 's/:/ | /1;s/~/ | /' | sed "s//   /g;" | tr '' '\n'
     ;;
+"delcomment" ) # COMMAND: delete a given comment from an item
+    errmsg="usage: $TODO_SH $action item# comment#"
+    item=$1
+    [ -z "$item" ] && die "Item number required. $errmsg"
+    number=$2
+    [ -z "$number" ] && die "Comment number required. Use viewcomment to see comments. $errmsg"
+    [ "$number" -lt 1 ] && die "Comment number should be 1 or more. $errmsg"
+    unumber=$number
+    number=$(( $number-1 ))
+    OLDIFS="$IFS"; IFS=$'\n';declare -a comments=( $(grep "^${item}:com" ext.txt) );IFS="$OLDIFS"
+    row=${comments[$number]}
+    [ -z "$row" ] && die "No such comment. Highest is ${#comments[@]}"
+    echo -e "\nThe comment is:\n"
+    frow=$( echo -e "$row" | cut -d : -f3- | tr '' '\n' | sed '2,$s/^/    /' )
+    echo -e "$frow"
+    short_row=$( echo "${frow:0:50}" | tr '\n' ' ' )
+    #sed "/$row/!d" ext.txt
+    if  [ $TODOTXT_FORCE = 0 ]; then
+        echo "Delete '$short_row'?  (y/n)"
+        read ANSWER
+    else
+        ANSWER="y"
+    fi
+    if [ "$ANSWER" = "y" ]; then
+        sed -i.bak "/$row/d" ext.txt
+        [ $VERBOSE_FLAG -gt 0 ] && echo "Bugzy: '$short_row' deleted."
+        [ ! -z "$EMAIL_TO" ] && echo -e "$frow" | mail -s "[DELCOMM] $item ($unumber) $short_row" $EMAIL_TO
+        cleanup
+    else
+        echo "Bugzy: No comments were deleted."
+    fi
+    ;;
+
 "help" )
     help
     ;;
