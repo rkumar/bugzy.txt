@@ -419,6 +419,7 @@ _list()
     filter_command="${pre_filter_command:-}"
 
 
+    # TODO : can we reuse this block for other queries lke quick
     [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: list : $@"
     for search_term in "$@"
     do
@@ -451,23 +452,22 @@ _list()
     [ -n "$post_filter_command" ] && {
         filter_command="${filter_command:-}${filter_command:+ | }${post_filter_command:-}"
     }
-    opt_fields=${opt_fields:-"1-8"}
-    opt_sort=${opt_sort:-"7 -r"}
     #width=$( tput cols )
     #let width-=3
         # cat "$TSV_FILE" \
         #cut -c1-$width "$TSV_FILE" \
     formatted_tsv_headers | cut -d '|' -f$opt_fields
         items=$(
-        sort -t$'\t' -k$opt_sort "$TSV_FILE" | \
-        cut -f$opt_fields 
+         cat "$TSV_FILE" 
           )
     if [ "${filter_command}" ]; then
         filtered_items=$(echo -ne "$items" | eval ${filter_command})
     else
         filtered_items=$items
     fi
-    filtered_items=$(echo -ne "$filtered_items" | pretty_print)
+    opt_fields=${opt_fields:-"1-8"}
+    opt_sort=${opt_sort:-"7 -r"}
+    filtered_items=$(echo -ne "$filtered_items" |sort -t$'\t' -k$opt_sort |cut -f$opt_fields |  pretty_print)
 
     if [ "$TSV_PRINT_DETAILS" == "1" ]; then
         # while read row removes leading and trailing spaces !! FIXME
@@ -1131,10 +1131,11 @@ pretty_print(){
     then
         local data=$( sed -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
             -e  "s/${DELIM}CRI${DELIM}/${DELIM}${PRI_A}CRI${DEFAULT}${DELIM}/g" \
-            -e  "s/${DELIM}MOD${DELIM}/${DELIM}${PRI_A}MOD${DEFAULT}${DELIM}/g" \
-            -e  "/^....${DELIM}CLO${DELIM}/s/^ /x/g" \
-            -e  "/^....${DELIM}CAN${DELIM}/s/^ /x/g" \
-            -e  "/^....${DELIM}OPE${DELIM}/s/^ /_/g" \
+            -e  "s/${DELIM}MOD${DELIM}/${DELIM}${PRI_B}MOD${DEFAULT}${DELIM}/g" \
+            -e  "/^....${DELIM}CLO${DELIM}/s/^ /x /g" \
+            -e  "/^....${DELIM}CAN${DELIM}/s/^ /x /g" \
+            -e  "/^....${DELIM}OPE${DELIM}/s/^ /_ /g" \
+            -e  "/^....${DELIM}STA${DELIM}/s/^ /@ /g" \
             -e  "/${DELIM}${tomorrow}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_A}\2${DEFAULT}/g" \
             -e  "/${DELIM}${dayafter}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_B}\2${DEFAULT}/g" \
             -e  "s/${tomorrow}/${PRI_A}${tomorrow}${DEFAULT}/g" \
@@ -2108,14 +2109,17 @@ note: PRIORITY must be anywhere from A to Z."
             # now that we've removed id from title, i've had to do some jugglery to switch cols
 "quick" | "q" ) # COMMAND a quick report showing status and title sorted on status
         stime=$SECONDS
+        opt_fields=${opt_fields:-"1,2,4,8"}
+        opt_postsort=${opt_postsort:-"1,1 -k3,4"}
         START=$(date +%s.%N)
         short_title
-        cut -f1,2,4,8 "$TSV_FILE" | \
+        #formatted_tsv_headers | cut -d '|' -f$opt_fields
+        cut -f$opt_fields "$TSV_FILE" | \
         sed -e "s/^\(....\)${DELIM}\(...\)/\2\1/" \
         -e 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g'  \
         -e 's/BUG/#/g;s/ENH/./g;s/FEA/./g;s/TAS/,/g;' | \
-        sort -k1,1 -k3,4 | \
-        color_by_priority | \
+        sort -k$opt_postsort | \
+        color_by_priority  | \
         pretty_print
 
         legend
