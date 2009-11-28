@@ -33,7 +33,7 @@ User Documentation
 
     > `mv bugzy.cfg ~/`
 
-The bug files are created in a directory ".todos" inside TODO_DIR.
+The bug files are created in a directory ".todos" inside TSV_DIR.
 
 Add-ons may be placed in $HOME/.bugzy.actions.d (default).
 
@@ -51,8 +51,8 @@ with
 
 ### Usage
 
-Current operations include add, mod, delete, list, list by severity,
-show, tag, quick/q (listing), grep, qadd (quick add).
+Current operations include **add**, **mod**, **delete**, **list**, list by severity,
+show / print, tag, **quick**/q (listing), grep, **qadd** (quick add).
 
 When adding an issue, entry of fields can be reduced by adding a default
 in the config file, and setting PROMPT to NO. When entering due_date, a
@@ -70,9 +70,9 @@ stopped or the first 3 letter of each.
 
 "selectm" or "selm" is a multiple criteria search as:
 
-   > bugzy selectm "type: bug" "status: open" ...  
+    bugzy selectm "type: bug" "status: open" ...  
 
-   > bugzy selectm "type=bug" "status=(open|started)" "severity=critical"  
+    bugzy selectm "type=bug" "status=(open|started)" "severity=critical"  
 
 
 "pri" adds a priority to as task or bug, which results in a change in color, and having it 
@@ -80,16 +80,14 @@ sorted above. "depri" removes priority.
 
 "liststat" lists tasks for a given status (|open|closed|started|stopped|canceled|).
 
-The above example relies on shell expansion, if supported by your shell.
-
 "show" item#
   
-   b show 106    # shows the bug 106, with colors 
-   b -p show 106  # show the bug in plain (no colors)
+    b show 106    # shows the bug 106, with colors 
+    b -p show 106  # show the bug in plain (no colors)
 
 "viewlog" item#
 
-  b log 108  # displays logs of 108
+   `b log 108`  # displays logs of 108
 
 "viewcomment" item#    # view comments for a item
 
@@ -102,37 +100,38 @@ The above example relies on shell expansion, if supported by your shell.
 
 "delcomment" item# comment#            # delete comment from an item
 
-Add-ons include `mdel`, `mpri`, `mdepri`.
+**Add-ons** include `mdel`, `mpri`, `mdepri` which do multiple deletes or
+priority setting and unsetting.
 
 TO ADD MORE HERE.
 
 You may also alias bugzy to "b" in ~/.bashrc or equivalent.
 
-    > alias b='bugzy -d ~/bugzy.cfg'  
-    > b add "Module aaa crashes on startup"  
-    > b show
-    > b list  
-    > b mod 1  
-    > b start 1  
-    > b close --comment:"some optional comment comes here" 1  
-    > b show  
-    > b add "Module bbb crashes on startup"  
-    > b pri 2 A  
-    > b  
+     alias b='bugzy -d ~/bugzy.cfg'  
+     b add "Module aaa crashes on startup"  
+     b show
+     b list  
+     b mod 1  
+     b start 1  
+     b close --comment:"some optional comment comes here" 1  
+     b show  
+     b add "Module bbb crashes on startup"  
+     b pri 2 A  
+     b  
 
-    > b depri 2  
-    > b q
-    > b status
-    > b grep crash
-    > b tag URG 1 2
-    > b grep @URG
-    > b liststat OPE
-    > b newest 5
-    > b recentlog
-    > b recentcomment
+     b depri 2  
+     b q
+     b status
+     b grep crash
+     b tag URG 1 2
+     b grep @URG
+     b liststat OPE
+     b newest 5
+     b recentlog
+     b recentcomment
 
-    > b -h
-    > b help
+     b -h     # short help
+     b help   # longer help
 
  
 
@@ -141,6 +140,6 @@ Others
 
 - Uses the excellent [todo.txt shell script](http://github.com/ginatrapani/todo.txt-cli) as a base.
 
-- Original anaemic release by rkumar on 2009-11-08.
+- Original *anaemic* release by rkumar on 2009-11-08.
 
 /* vim: set tw=72: */
