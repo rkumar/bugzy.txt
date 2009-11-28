@@ -411,7 +411,8 @@ edit_tmpfile()
 
 
 shopt -s extglob
-# this is the new list. earlier on is now oldlist
+## this is the new list. earlier on is now oldlist
+## sub-option: --sort, --fields
 _list()
 {
     ## Prefix the filter_command with the pre_filter_command
@@ -450,13 +451,16 @@ _list()
     [ -n "$post_filter_command" ] && {
         filter_command="${filter_command:-}${filter_command:+ | }${post_filter_command:-}"
     }
-    width=$( tput cols )
-    let width-=3
+    opt_fields=${opt_fields:-"1-8"}
+    opt_sort=${opt_sort:-"7 -r"}
+    #width=$( tput cols )
+    #let width-=3
         # cat "$TSV_FILE" \
-    formatted_tsv_headers 
+        #cut -c1-$width "$TSV_FILE" \
+    formatted_tsv_headers | cut -d '|' -f$opt_fields
         items=$(
-        cut -c1-$width "$TSV_FILE" \
-        | eval ${TSV_SORT_COMMAND} \
+        sort -t$'\t' -k$opt_sort "$TSV_FILE" | \
+        cut -f$opt_fields 
           )
     if [ "${filter_command}" ]; then
         filtered_items=$(echo -ne "$items" | eval ${filter_command})
@@ -817,7 +821,7 @@ tsv_headers(){
 # see pretty_print
 formatted_tsv_headers(){
     echo "  Id |Statu|Sever|Type |Assigned To |Date Created|  Due Date  |     Title"
-    echo "-----+-----+-----+-----+------------+------------+------------+-----------------------"
+    echo "-----|-----|-----|-----|------------|------------|------------|-----------------------"
 }
 ## color the given data
 ## please set USE_PRI before calling else it will use $PRI_A
@@ -1774,6 +1778,8 @@ done # while true
 
 
 "list" | "ls") # COMMAND: list use -l for details
+## sub-option: --sort, --fields
+## b list --fields:"1,2,7,8" --sort:"2,2 -k8,8"
        _list "$@"
        cleanup;;
 
@@ -1854,22 +1860,39 @@ done # while true
     # TODO formatting required
     # redo : sort on crit and colorize
 "lbs") # COMMAND: list by severity
-    formatted_tsv_headers
-    words="CRI MOD NOR"
-    ctr=1
-    for ii in $words
-    do
-        regex="${REG_ID}${DELIM}${REG_TYPE}${DELIM}$ii"
-        case $ctr in
-            1)  USE_PRI="$PRI_A";;
-            2)  USE_PRI="$PRI_B";;
-            3)  USE_PRI="$PRI_C";;
-            *)  USE_PRI="$PRI_X";;
-        esac
-        grep "$regex" "$TSV_FILE" | color_line 
-        let ctr+=1
-    done
+## b lbs --fields:"1,3,4,7,8"
+## sub-options: --fields  - a field list compatible with cut command
+## sub-options: --sort  - a field number to sort on, default 3. e.g. --sort:"2 -r"
+##              --sort sorts on original field list, so as to continue sorting on SEVERITY
+##+               even after the fields are reduced
+    if [ -z "$opt_fields" ]; then
+        formatted_tsv_headers
+    else
+        formatted_tsv_headers | cut -d '|' -f$opt_fields
+    fi
+    if [ -z "$opt_sort" ]; then
+        opt_sort=$TSV_SEVERITY_COLUMN1
+    fi
+    data=$( 
+    sort -t$'\t' -k$opt_sort "$TSV_FILE" | \
+        sed -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
+            -e  "/${DELIM}CRI${DELIM}/s/.*/${PRI_A}&${DEFAULT}/" \
+            -e  "/${DELIM}MOD${DELIM}/s/.*/${PRI_B}&${DEFAULT}/" \
+            -e "s/$DELIM/$TSV_OUTPUT_DELIMITER/g"  \
+        )
+        if [ -z "$opt_fields" ]; then
+            echo -e "$data"
+        else
+            echo -e "$data"  | cut -d '|' -f$opt_fields
+        fi
 
+        [ $TSV_VERBOSE_FLAG -gt 1 ] && { echo; echo  "Listing is sorted on field 3. You may reduce fields by using the --fields option. e.g. --fields:\"1,2,3,5,8\""; 
+        echo
+        echo "To change sort order, use --sort:n"
+        echo "--sort:\"2 -r\""
+        echo "sort field numbers pertain to _original_ field numbers"
+    
+    }
     ;;
     
     "ope" | "sta" | "clo" | "can" | "sto" | \
