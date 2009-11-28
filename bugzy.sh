@@ -1463,7 +1463,7 @@ export PRI_B=$GREEN         # color for B priority
 export PRI_C=$CYAN    # color for C priority
 export PRI_X=$WHITE         # color for rest of them
 # OLD flat file
-TSV_SORT_COMMAND=${TSV_SORT_COMMAND:-env LC_COLLATE=C sort -f -k3}
+#TSV_SORT_COMMAND=${TSV_SORT_COMMAND:-env LC_COLLATE=C sort -f -k3}
 # for tsv (list cannot use tsv_titles since FILELIST is not used
 #TSV_SORT_COMMAND=${TSV_SORT_COMMAND:-env LC_COLLATE=C sort -f -k2}
 TSV_SORT_COMMAND=${TSV_SORT_COMMAND:-"env LC_COLLATE=C sort -t$'\t' -k7 -r"}
@@ -2015,7 +2015,6 @@ note: PRIORITY must be anywhere from A to Z."
 "upcoming" | "upc" ) # COMMAND: shows upcoming tasks
             # now check field 7, convert to unix epoch and compare to now, if greater.
             # if less then break out, no more printing
-            now=`date '+%Y-%m-%d'`
             #tomorrow=`date --date="tomorrow" '+%Y-%m-%d'`
             tomorrow=$( date_calc +1 )
             grep -v "${DELIM}CLO${DELIM}" "$TSV_FILE" | sort -t$'\t' -k7 -r | \
@@ -2025,12 +2024,11 @@ note: PRIORITY must be anywhere from A to Z."
             ( while read LINE
             do
                 due_date=$( echo "$LINE" | cut -d  $'\t' -f7 )
-                #currow=$( date --date="2009-11-25 00:00" +%s )
                 currow=$( date --date="$due_date" +%s )
                 today=$( date +%s )
                 if [ $currow -ge $today ];
                 then
-                    if [ $TSV_NOW == ${due_date:0:10} ];
+                    if [ $TSV_NOW_SHORT == ${due_date:0:10} ];
                     then
                         LINE=$( echo -e "$PRI_A$LINE$DEFAULT" )
                         echo -e "$LINE"
