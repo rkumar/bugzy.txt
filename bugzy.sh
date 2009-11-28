@@ -45,7 +45,7 @@ TSV_STATUS_COLUMN1=2
 TSV_SEVERITY_COLUMN1=3
 TSV_TYPE_COLUMN1=4
 TSV_ASSIGNED_TO_COLUMN1=5
-TSV_CREATE_DATE_COLUMN1=6
+TSV_DATE_CREATED_COLUMN1=6
 TSV_DUE_DATE_COLUMN1=7
 TSV_TITLE_COLUMN1=8
 
@@ -765,7 +765,7 @@ x
 !
 }
         #log_changes "$reply" "$reply added.${loginput:0:25} ..." "${#loginput} chars" "$file"
-        log_changes1 "$reply" "$reply added $howmanylines.${loginput:0:40} ..." 
+        log_changes1 "$reply" "#$item$reply added.${loginput:0:40} ...$howmanylines" 
         echo "$reply added to $item"
         [ "$TSV_ADD_COMMENT_COUNT_TO_TITLE" -gt 0 ] && add_comment_count_to_title;
     
@@ -798,7 +798,7 @@ add_fix(){
         text=$(cat $TMP_FILE)
         howmanylines=$( echo -e "$text" | wc -cl | tr -s ' ' | sed 's/^ /(/;s/$/)/;s# #/#')
         update_extra_data $item $reply "$text"
-        log_changes1 $reply "Fix added $howmanylines. ${text:0:40}..."
+        log_changes1 $reply "#$item Fix added $howmanylines. ${text:0:40}..."
         let modified+=1
     }
 }
@@ -982,8 +982,9 @@ tsv_delete_other_files(){
     return $?
 }
 ## updates tsv row with data for given
-# item, columnname, value
-# -1 on errors
+## item, columnname, value
+## -1 on errors
+## @obsolete remove after a couple versions
 tsv_set_column_value(){
     item=$1
     columnname=$2
@@ -1042,40 +1043,22 @@ convert_short_to_long_code(){
         ;;
     esac
 }
-#convert_row_to_array(){
-    #local arow=${1:-"$G_ROWDATA"}
-    #OLDIFS="$IFS"
-    #IFS=$'\t'
-    #F=( $(echo "$arow" ) )
-    #IFS="$OLDIFS"
-#}
-OLD_convert_array_to_row(){
-    #local arr=${1:-"$F"}
-    G_NEWROW=""
-    for index in "${!F[@]}"
-    do
-        G_NEWROW+="${F[$index]}${DELIM}"
-    done
-    # remove last delim
-    G_NEWROW="${var%?}"
-}
 
 ## print out the item like it is in the file.
-# i have removed coloring of the labels since we may mail the file.
-# however the caller can color the labels.
-# echo -e "`b print 143 | sed 's/^\([^:]*\):/'$YELLOW'\1:'$DEFAULT'/g' `"
+## i have removed coloring of the labels since we may mail the file.
+## suboptions: --no_log (suppress log printing)
+## however the caller can color the labels.
+## echo -e "`b print 143 | sed 's/^\([^:]*\):/'$YELLOW'\1:'$DEFAULT'/g' `"
 print_item(){
-    errmsg="usage: $TSV_PROGNAME $action task#"
+    errmsg="usage: $TSV_PROGNAME $action [--no_log] task#"
     common_validation $1 $errmsg
-    #item=$1
-    ## create an array
-    #convert_row_to_array
+
     output=""
     for field in $( echo $TSV_PRINTFIELDS )
     do
-        index=`tsv_column_index "$field"`
-        #value=$( echo "$rowdata" | cut -d $'\t' -f $index )
-        #index=$(( index - 1 ))
+        #index=`tsv_column_index "$field"`
+        get_column_index "$field"
+        index=$colindex
         value="${F[$index]}"
         xxfile=$( printf "%-13s" "$field" )
         #row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
@@ -1085,12 +1068,14 @@ print_item(){
     done
         # read up the files containing multiline data
         xfields="description fix comment log"
+        [ ! -z "$opt_no_log" ] && { xfields="${xfields/log/}"; }
         for xfile in $xfields
         do
             description=$( get_extra_data $item $xfile )
             [ ! -z "$description" ] && { 
             xxfile=$( printf "%-13s" "$xfile" )
-            row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
+            #row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
+            row=$( echo -e "$xxfile: " )
             output+=$( echo -e "\n$row\n" )
             output+="\n"
             # C-a processing
@@ -1615,7 +1600,8 @@ case $action in
         get_input "emailid" "$EMAIL_TO"
 
         [ ! -z "$EMAIL_TO" ] && { 
-            body=`PRI_A=$NONE;DEFAULT=$NONE;print_item $item`
+            #body=`PRI_A=$NONE;DEFAULT=$NONE;print_item $item`
+            body=`print_item $item`
             echo -e "$body" | mail -s "$todo" $EMAIL_TO
         }
     }
@@ -1634,7 +1620,8 @@ case $action in
                 ANSWER="y"
             fi
             if [ "$ANSWER" = "y" ]; then
-                body=`PRI_A=$NONE;DEFAULT=$NONE;print_item $item`
+                #body=`PRI_A=$NONE;DEFAULT=$NONE;print_item $item`
+                body=`print_item $item`
                 [ ! -d "$DELETED_DIR" ] && mkdir "$DELETED_DIR";
                 # tsv stuff
                 tsv_delete_item $item
@@ -1664,7 +1651,8 @@ case $action in
     [ "$reply" == "quit" ] && {
       [ $modified -gt 0 ] && {
       mtitle=`tsv_get_title $item`
-      body=`PRI_A=$NONE;DEFAULT=$NONE;print_item $item`
+      #body=`PRI_A=$NONE;DEFAULT=$NONE;print_item $item`
+      body=`print_item $item`
         [ ! -z "$EMAIL_TO" ] && echo -e "$body" | mail -s "[MOD] $mtitle" $EMAIL_TO
         }
       break
@@ -1689,7 +1677,7 @@ case $action in
         [ "$oldvalue" == "$newcode" ] && { die "$item is already $oldvalue ($longcode)"; }
         set_update_row $reply $newcode
         #log_changes $reply $oldvalue $newcode $file
-        log_changes1 $reply "$reply changed from $oldvalue to $newcode"
+        log_changes1 $reply "#$item $reply changed from $oldvalue to $newcode"
         newline="$reply: $newcode" # for FLAT file
         [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
         let modified+=1
@@ -1706,7 +1694,7 @@ case $action in
                    F[ $TSV_TITLE_COLUMN1 ]="$text"
                    update_row
                    #log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
-                   log_changes1 $reply "$reply changed to ${text:0:40}..."
+                   log_changes1 $reply "#$item $reply changed to ${text:0:40}..."
                    [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak "/^$reply:/s/^.*$/$reply: $text/" $file
                    #show_diffs 
                    let modified+=1
@@ -1735,7 +1723,7 @@ case $action in
                    update_row 
 
                    #log_changes $reply "${oldvalue}" "${text}" "$file"
-                   log_changes1 $reply "$reply changed from ${oldvalue} to ${text}"
+                   log_changes1 $reply "#$item $reply changed from ${oldvalue} to ${text}"
                    [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak "/^$reply:/s/^.*$/$reply: $text/" $file
                    #show_diffs 
                    let modified+=1
@@ -1768,7 +1756,7 @@ x
 }
         #log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
         howmanylines=$( echo -e "$text" | wc -cl | tr -s ' ' | sed 's/^ /(/;s/$/)/;s# #/#')
-        log_changes1 $reply "$reply changed $howmanylines. ${text:0:40}..."
+        log_changes1 $reply "#$item $reply changed. ${text:0:40}...$howmanylines"
                    let modified+=1
 
     #show_diffs $file $file.bak.1 
@@ -1934,8 +1922,9 @@ note: PRIORITY must be anywhere from A to Z."
         ;;
 
 
+# suboptions: --no_log (suppress log printing)
 "show" ) # COMMAND: shows an item, defaults to last
-        errmsg="usage: $TSV_PROGNAME show ITEM#"
+        errmsg="usage: $TSV_PROGNAME show [--no_log] ITEM#"
         item=$1
         [ -z "$1" ] && {
             item=$( sed '$!d' "$TSV_FILE" | cut -f1 | sed 's/ *//g' )
@@ -1980,6 +1969,7 @@ note: PRIORITY must be anywhere from A to Z."
         echo
         # read up the files containing multiline data
         xfields="description fix comment log"
+        [ ! -z "$opt_no_log" ] && { xfields="${xfields/log/}"; }
         for xfile in $xfields
         do
             description=$( get_extra_data $item $xfile )
@@ -2261,7 +2251,7 @@ note: PRIORITY must be anywhere from A to Z."
 ;;
 "recentlog" | "rl") # COMMAND: list recent logs
     # TODO, we should show the title too , somehow
-    grep ':log:' "$TSV_EXTRA_DATA_FILE" | tail | cut -d : -f1,4- | sed 's/:/ | /1;s/~/ | /'
+    grep ':log:' "$TSV_EXTRA_DATA_FILE" | tail -25 | cut -d : -f1,4- | sed 's/:/ | /1;s/~/ | /'
     ;;
 "recentcomment" | "rc" ) # COMMAND: list recent comments 
     # TODO, we should show the title too , somehow
