@@ -6,8 +6,6 @@
 # rkumar                                                
 # 
 #
-# TODO - replace tsv_set_column_value with update_row
-# TODO - replace tsv_get_column_value with F[n] or get_column
 # TODO - entry of title, check for tab and replace with spaces
 # TODO - how to view archived data
 # CAUTION: we are putting priority at start of title, and tags *and* comment count at end.
@@ -658,7 +656,8 @@ change_status()
     common_validation $1 "$errmsg"
     reply="status"; input="$action";
 #    oldvalue=`tsv_get_column_value $item $reply`
-    oldvalue="${G_STATUS}"
+#    oldvalue=$( get_column $TSV_STATUS_COLUMN1 )
+     oldvalue="$G_STATUS"
     var=$( printf "%s" "${action:0:3}" | tr 'a-z' 'A-Z' )
     oldvaluelong=`convert_short_to_long_code "status" $oldvalue`
     [ "$oldvalue" == "$var" ] && die "$item is already $oldvalue ($oldvaluelong)"
@@ -775,7 +774,8 @@ x
 add_comment_count_to_title(){
     count=$( grep -c "^$item:com:" "$TSV_EXTRA_DATA_FILE" )
     # tsv stuff
-    oldvalue=$( tsv_get_column_value $item "title" )
+    #oldvalue=$( tsv_get_column_value $item "title" )
+    oldvalue="$G_TITLE"
     newvalue=$( echo "$oldvalue" | sed  -e "s/ ([0-9]*)$//" -e  "s/$/ ($count)/" )
 #    echo "updating title to $newvalue"
     #tsv_set_column_value $item "title" "$newvalue"
@@ -920,18 +920,17 @@ tsv_get_rowdata_with_lineno(){
     G_ROWDATA=$rowdata
 }
 
-# returns value of column for an item and fieldname
-# bombs when description or fix entered
+## returns value of column for an item and fieldname
+## not to be used for description or fix or comment - use extra_data methods for those
+## This read values from the file each time, use only in loop if the value in our
+## array could change. Otherwise, use F[n] or get_column
 tsv_get_column_value(){
     item="$1"
     field="$2"
-    #echo "item:$item,field:$field."
     paditem=$( printf "%4s" $item )
     rowdata=$( grep "^$paditem" "$TSV_FILE" )
     [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; return;}
-    #echo "rowdata:$rowdata"
     index=`tsv_column_index "$field"`
-    #echo "index:$index"
     [ $index -lt 0 ] && { echo "ERROR FIELDNAME $2"; return;}
     echo "$rowdata" | cut -d $'\t' -f $index
 }
@@ -1908,7 +1907,8 @@ note: PRIORITY must be anywhere from A to Z."
 
 
         # tsv stuff
-        oldvalue=$( tsv_get_column_value $item "title" )
+        #oldvalue=$( tsv_get_column_value $item "title" )
+        oldvalue="$G_TITLE"
         newvalue=$( echo "$oldvalue" | sed  -e "s/^([A-Z]) //" -e  "s/^/($newpri) /" )
         #tsv_set_column_value $item "title" "$newvalue"
                    F[ $TSV_TITLE_COLUMN1 ]="$newvalue"
@@ -1921,7 +1921,8 @@ note: PRIORITY must be anywhere from A to Z."
         errmsg="usage: $TSV_PROGNAME $action ITEM#"
         common_validation $1 $errmsg 
         # tsv stuff
-        oldvalue=$( tsv_get_column_value $item "title" )
+        #oldvalue=$( tsv_get_column_value $item "title" )
+        oldvalue="$G_TITLE"
         newvalue=$( echo "$oldvalue" | sed  -e "s/^(.) //" )
         #tsv_set_column_value $item "title" "$newvalue"
                    F[ $TSV_TITLE_COLUMN1 ]="$newvalue"
