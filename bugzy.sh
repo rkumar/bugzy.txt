@@ -2106,8 +2106,16 @@ note: PRIORITY must be anywhere from A to Z."
             # if less then break out, no more printing
             #tomorrow=`date --date="tomorrow" '+%Y-%m-%d'`
             tomorrow=$( date_calc +1 )
-            grep -v "${DELIM}CLO${DELIM}" "$TSV_FILE" | sort -t$'\t' -k7 -r | \
-            sed -e 's/OPE/-/g;s/CLO/x/g;s/STA/@/g;s/STO/$/g;s/CAN/x/g'  \
+            #| cut -d $'\t' -f$opt_fields \
+            opt_fields=${opt_fields:-"1,2,3,4,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
+
+            echo 
+            echo "   ---  Issues with Upcoming due dates --- "
+            echo 
+            grep -v "${DELIM}CLO${DELIM}" "$TSV_FILE" \
+            | sort -t$'\t' -k7 -r  \
+            | cut -d$'\t' -f1-7,10 \
+            | sed -e 's/OPE/-/g;s/CLO/x/g;s/STA/@/g;s/STO/$/g;s/CAN/x/g'  \
             -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
             -e 's/BUG/#/g;s/ENH/./g;s/FEA/./g;s/TAS/,/g;' | \
             ( while read LINE
