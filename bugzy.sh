@@ -1226,8 +1226,8 @@ show_source(){
 }
 ## short header for reports with on Id and title
 short_title(){
-    echo "  Id |Sta| B | Cc |     Title                                   "
-    echo "-----+---+---+----+---------------------------------------------"
+    echo "  Id |Sta| B | Cc  |     Title                                   "
+    echo "-----+---+---+-----+---------------------------------------------"
 }
 
 ## first use gnu date format to  calc
@@ -1432,15 +1432,21 @@ generic_report()
         START=$(date +%s.%N)
         #formatted_tsv_headers | cut -d '|' -f$opt_fields
         # TODO How to get a grep in here
-        cut -f$opt_fields "$TSV_FILE" | \
-        #sed -e "s/^\(....\)${DELIM}\(...\)/\2\1/" \
-        sed -e "s/${DELIM} $//" \
+    FLAG=""
+    filter=${1:-"."}
+    [[ ${filter:0:1} == "-" ]] && {
+       FLAG="-v"
+       filter=${filter:1}
+    }
+    grep -E $FLAG "$filter" "$TSV_FILE" \
+        | cut -f$opt_fields  \
+        | sed -e "s/${DELIM} $//" \
         -e "s/${DELIM}\(([0-9]\{1,\})\)$/ \1/" \
         -e 's/OPE/-/;s/CLO/x/;s/STA/@/;s/STO/$/;s/CAN/x/'  \
-        -e 's/BUG/#/;s/ENH/./;s/FEA/./;s/TAS/,/;' | \
-        sort -k$opt_postsort | \
-        color_by_priority  | \
-        pretty_print
+        -e 's/BUG/#/;s/ENH/./;s/FEA/./;s/TAS/,/;'  \
+        | sort -k$opt_postsort  \
+        | color_by_priority   \
+        | pretty_print
 
         legend
         #show_source
@@ -2170,7 +2176,7 @@ note: PRIORITY must be anywhere from A to Z."
         opt_fields=${opt_fields:-"1,2,4,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
         opt_postsort=${opt_postsort:-"2,2 -k3,4"}
         short_title
-        generic_report
+        generic_report "$@"
             ;;
 
 "lastmodified" | "lm" ) # COMMAND a quick report showing status and title sorted on status
