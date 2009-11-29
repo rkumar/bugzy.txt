@@ -5,8 +5,8 @@
 # 2009-11-24 v0.1.12 - am removing old flat file creation
 # rkumar                                                
 # 
-#
-# TODO - entry of title, check for tab and replace with spaces
+# 
+# TODO - entry of title, check for tab or non-print chars and replace with spaces
 # TODO - how to view archived data
 # CAUTION: we are putting priority at start of title, and tags *and* comment count at end.
 #
@@ -47,11 +47,9 @@ TSV_TYPE_COLUMN1=4
 TSV_ASSIGNED_TO_COLUMN1=5
 TSV_DATE_CREATED_COLUMN1=6
 TSV_DUE_DATE_COLUMN1=7
-TSV_TITLE_COLUMN1=8
-TSV_COMMENT_COUNT_COLUMN1=9
-TSV_MODIFIED_COLUMN1=10
-TSV_TITLE_COLUMN0=7
-TSV_STATUS_COLUMN0=1
+TSV_COMMENT_COUNT_COLUMN1=8
+TSV_MODIFIED_COLUMN1=9
+TSV_TITLE_COLUMN1=10
 
 TSV_CREATE_FLAT_FILE=0
 TSV_WRITE_FLAT_FILE=0
@@ -457,7 +455,7 @@ _list()
     #let width-=3
         # cat "$TSV_FILE" \
         #cut -c1-$width "$TSV_FILE" \
-    formatted_tsv_headers | cut -d '|' -f$opt_fields
+    pretty_print_headers | cut -d '|' -f$opt_fields
         items=$(
          cat "$TSV_FILE" 
           )
@@ -466,9 +464,14 @@ _list()
     else
         filtered_items=$items
     fi
-    opt_fields=${opt_fields:-"1-8"}
-    opt_sort=${opt_sort:-"7 -r"}
-    filtered_items=$(echo -ne "$filtered_items" |sort -t$'\t' -k$opt_sort |cut -f$opt_fields |  pretty_print)
+    opt_fields=${opt_fields:-"1-7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
+    opt_sort=${opt_sort:-"1,1"}
+
+    filtered_items=$(
+    echo -ne "$filtered_items" |\
+    sort -t$'\t' -k$opt_sort |\
+    cut -f$opt_fields |\
+    pretty_print)
 
     if [ "$TSV_PRINT_DETAILS" == "1" ]; then
         # while read row removes leading and trailing spaces !! FIXME
@@ -478,11 +481,7 @@ _list()
         for row in $( echo "$filtered_items" )
         do
             echo -ne "$row\n"
-            # ugly attempt to remove ascii stuff from first row
-            #rowitem=$( echo -e "$row" | cut -d $'|' -f1 | sed 's/....*m //;s/ $//' )
             rowitem=$( echo -e "$row" | cut -d $'|' -f1 )
-            #     echo "1rowitem was ($rowitem)"
-            #rowitem=${rowitem%% *} ## trim trailing blanks spaces
             rowitem=${rowitem// /}
             if [[ "$rowitem" = +([0-9]) ]]; then  
                 get_extra_data $rowitem description | sed '1s/^/      Desc: /;2,$s/^/      >/g;'
@@ -688,7 +687,6 @@ change_status()
 ## for actions that require a bug id
 ## sets item, file
 ## sets rowdata and lineno by calling tsv_get_rowdata...
-## TODO set title and lineno in one shot, so we don't keep checking for it, maybe even other fields
 common_validation()
 {
     item=$1
@@ -815,14 +813,19 @@ tsv_titles(){
 ## print titles of CSV file
 tsv_headers(){
     #sed '1q' "$TSV_FILE"
-    echo "id	status	severity	type	assigned_to	date_created	due_date	title"
+    #echo "id	status	severity	type	assigned_to	date_created	due_date	title"
+    echo "id	status	severity	type	assigned_to	date_created	due_date	CC	modified	title"
     #cat "$TSV_TITLES_FILE"
 }
 # gives formatter header for printing
 # see pretty_print
 formatted_tsv_headers(){
-    echo "   Id |Statu|Sever|Type |Assigned To |Date Created|  Due Date  |     Title"
-    echo "------|-----|-----|-----|------------|------------|------------|-----------------------"
+    echo "  Id |Statu|Sever|Type |Assigned To |Date Created|  Due Date  | CC  | Modified |     Title  "
+    echo "-----|-----|-----|-----|------------|------------|------------|-----|----------|-------------------"
+}
+pretty_print_headers(){
+    echo "  Id |Sta| Sev |Bug|Assigned To |Date Created|  Due Date  | CC  | Modified |     Title  "
+    echo "-----|---|-----|---|------------|------------|------------|-----|----------|--------------------------------"
 }
 ## color the given data
 ## please set USE_PRI before calling else it will use $PRI_A
@@ -1124,6 +1127,10 @@ calc_overdue()
 # \+ does not work in my sed, but works in gsed
 pretty_print(){
     #tomorrow=`date --date="tomorrow" '+%Y-%m-%d'`
+            #-e  "/^....${DELIM}CLO${DELIM}/s/^ /x /g" \
+            #-e  "/^....${DELIM}CAN${DELIM}/s/^ /x /g" \
+            #-e  "/^....${DELIM}OPE${DELIM}/s/^ /_ /g" \
+            #-e  "/^....${DELIM}STA${DELIM}/s/^ /@ /g" \
     tomorrow=$( date_calc +1 )
 
     #dayafter=`date --date="+2 days" '+%Y-%m-%d'`
@@ -1133,10 +1140,17 @@ pretty_print(){
         local data=$( sed -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
             -e  "s/${DELIM}CRI${DELIM}/${DELIM}${PRI_A}CRI${DEFAULT}${DELIM}/g" \
             -e  "s/${DELIM}MOD${DELIM}/${DELIM}${PRI_B}MOD${DEFAULT}${DELIM}/g" \
-            -e  "/^....${DELIM}CLO${DELIM}/s/^ /x /g" \
-            -e  "/^....${DELIM}CAN${DELIM}/s/^ /x /g" \
-            -e  "/^....${DELIM}OPE${DELIM}/s/^ /_ /g" \
-            -e  "/^....${DELIM}STA${DELIM}/s/^ /@ /g" \
+        -e "s/${DELIM} $//" \
+        -e "s/${DELIM}\(([0-9]\{1,\})\)$/ \1/" \
+            -e  "/^....${DELIM}CLO${DELIM}/s/CLO/x/" \
+            -e  "/^....${DELIM}CAN${DELIM}/s/CAN/x/" \
+            -e  "/^....${DELIM}OPE${DELIM}/s/OPE/_/" \
+            -e  "/^....${DELIM}STA${DELIM}/s/STA/@/" \
+            -e  "/${DELIM}NOR${DELIM}/s/NOR/   /" \
+            -e  "/${DELIM}BUG${DELIM}/s/BUG/#/" \
+            -e  "/${DELIM}TAS${DELIM}/s/TAS/./" \
+            -e  "/${DELIM}FEA${DELIM}/s/FEA/ /" \
+            -e  "/${DELIM}ENH${DELIM}/s/ENH/ /" \
             -e  "/${DELIM}${tomorrow}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_A}\2${DEFAULT}/g" \
             -e  "/${DELIM}${dayafter}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_B}\2${DEFAULT}/g" \
             -e  "s/${tomorrow}/${PRI_A}${tomorrow}${DEFAULT}/g" \
@@ -1212,8 +1226,8 @@ show_source(){
 }
 ## short header for reports with on Id and title
 short_title(){
-    echo "   Id | B |      Title                                   "
-    echo "------+---+----------------------------------------------"
+    echo "  Id |Sta| B | Cc |     Title                                   "
+    echo "-----+---+---+----+---------------------------------------------"
 }
 
 ## first use gnu date format to  calc
@@ -1260,7 +1274,10 @@ create_tsv_file()
     tabseve=$( echo ${i_severity:0:3} | tr "a-z" "A-Z" )
     tabtype=$( echo ${i_type:0:3} | tr "a-z" "A-Z" )
     tabid=$( printf "%4s" "$serialid" )
-    tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$TSV_NOW${del}$i_due_date${del}$atitle"
+    tabcommentcount="   "
+    tabtimestamp=$(date +%s)
+    TSV_NOW=`date "$TSV_DATE_FORMAT"`
+    tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$TSV_NOW${del}$i_due_date${del}$tabcommentcount$del$tabtimestamp$del$atitle"
     echo "$tabfields" >> "$TSV_FILE"
     [ -d "$ISSUES_DIR" ] || mkdir "$ISSUES_DIR"
 # stop creating those files
@@ -1379,7 +1396,7 @@ select_row(){
     G_ROWDATA="$rowdata"
 } 
 ## updates the row back to the table
-# TODO add modified time in epoch after title 9th pos
+## adds modified time in epoch after title 9th pos
 update_row(){
     [ -z "$KEY" ] && { echo "update_row key blank."; exit 1; }
     local seconds=$( date +%s )
@@ -1409,6 +1426,27 @@ set_update_row(){
     #set_column $colindex "$text"
     F[$colindex]="$text"
     update_row
+}
+generic_report()
+{
+        START=$(date +%s.%N)
+        #formatted_tsv_headers | cut -d '|' -f$opt_fields
+        # TODO How to get a grep in here
+        cut -f$opt_fields "$TSV_FILE" | \
+        #sed -e "s/^\(....\)${DELIM}\(...\)/\2\1/" \
+        sed -e "s/${DELIM} $//" \
+        -e "s/${DELIM}\(([0-9]\{1,\})\)$/ \1/" \
+        -e 's/OPE/-/;s/CLO/x/;s/STA/@/;s/STO/$/;s/CAN/x/'  \
+        -e 's/BUG/#/;s/ENH/./;s/FEA/./;s/TAS/,/;' | \
+        sort -k$opt_postsort | \
+        color_by_priority  | \
+        pretty_print
+
+        legend
+        #show_source
+        END=$(date +%s.%N)
+        DIFF=$(echo "$END - $START" | bc)
+        echo $DIFF " seconds."
 }
 
 ## ADD FUNCTIONS ABOVE
@@ -1785,19 +1823,20 @@ done # while true
 "list" | "ls") # COMMAND: list use -l for details
 ## sub-option: --sort, --fields
 ## b list --fields:"1,2,7,8" --sort:"2,2 -k8,8"
-opt_fields=${opt_fields:-"1-4,6-9"}
+opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
        _list "$@"
        cleanup;;
 
 
 "liststat" | "lists" ) #COMMAND: lists items for a given status 
     valid="|OPE|CLO|STA|STO|CAN|"
-    errmsg="usage: $TSV_PROGNAME $action $valid"
+    errmsg="usage: $TSV_PROGNAME $action $valid. Prepend with a - to exclude, e.g. -CLO"
     status=$1
     [ -z "$status" ] && die "$errmsg"
     status=$( printf "%s\n" "$status" | tr 'a-z' 'A-Z' )
 
-    ## all except given status
+    opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
+    ## all except given status, if - prepended e.g. -CLO
     FLAG=""
     [[ ${status:0:1} == "-" ]] && {
        FLAG="-v"
@@ -1807,10 +1846,14 @@ opt_fields=${opt_fields:-"1-4,6-9"}
 
     count=$(echo $valid | grep -c $status)
     [ $count -eq 1 ] || die "$errmsg"
-    formatted_tsv_headers 
+    #formatted_tsv_headers 
+    pretty_print_headers | cut -d '|' -f$opt_fields 
     grep  $FLAG "^....${DELIM}$status${DELIM}" "$TSV_FILE" \
+        | cut -d $'\t' -f$opt_fields \
         | eval ${TSV_SORT_COMMAND}           \
         | pretty_print
+
+    legend
     ;;
 
 
@@ -1856,10 +1899,13 @@ opt_fields=${opt_fields:-"1-4,6-9"}
     [ $full_regex -gt 0 ] && regex+="${assigned_to}${DELIM}${date_created}${DELIM}${due_date}${DELIM}${title}"
     [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "regex:($regex)"
     #tsv_headers
-    formatted_tsv_headers 
+    opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
+    pretty_print_headers | cut -d '|' -f$opt_fields
     # -P is GNU only, wont work everywhere, UGH
     #grep -P "$regex" "$TSV_FILE"
-    grep "$regex" "$TSV_FILE" | pretty_print
+    grep "$regex" "$TSV_FILE" \
+    | cut -d $'\t' -f$opt_fields \
+    | pretty_print
     
     ;;
 
@@ -1871,7 +1917,16 @@ opt_fields=${opt_fields:-"1-4,6-9"}
 ## sub-options: --sort  - a field number to sort on, default 3. e.g. --sort:"2 -r"
 ##              --sort sorts on original field list, so as to continue sorting on SEVERITY
 ##+               even after the fields are reduced
-    opt_fields=${opt_fields:-"1-9"}
+    FLAG=""
+    filter=${1:-"."}
+    [[ ${filter:0:1} == "-" ]] && {
+       FLAG="-v"
+       filter=${filter:1}
+    }
+    echo
+    echo " ---   Listing of issues sorted by severity  --- "
+    echo
+    opt_fields=${opt_fields:-"1-7,$TSV_TITLE_COLUMN1"}
     if [ -z "$opt_fields" ]; then
         formatted_tsv_headers
     else
@@ -1881,17 +1936,15 @@ opt_fields=${opt_fields:-"1-4,6-9"}
         opt_sort=$TSV_SEVERITY_COLUMN1
     fi
     data=$( 
-    sort -t$'\t' -k$opt_sort "$TSV_FILE" |cut -d $'\t' -f$opt_fields | \
-        sed -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
+    grep -E $FLAG "$filter" "$TSV_FILE" \
+        | sort -t$'\t' -k$opt_sort \
+        | cut -d $'\t' -f$opt_fields  \
+        | sed -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
             -e  "/${DELIM}CRI${DELIM}/s/.*/${PRI_A}&${DEFAULT}/" \
             -e  "/${DELIM}MOD${DELIM}/s/.*/${PRI_B}&${DEFAULT}/" \
             -e "s/$DELIM/$TSV_OUTPUT_DELIMITER/g"  \
         )
-        if [ -z "$opt_fields" ]; then
-            echo -e "$data"
-        else
-            echo -e "$data"   
-        fi
+        echo -e "$data"
 
         [ $TSV_VERBOSE_FLAG -gt 1 ] && { echo; echo  "Listing is sorted on field 3. You may reduce fields by using the --fields option. e.g. --fields:\"1,2,3,5,8\""; 
         echo
@@ -2114,66 +2167,74 @@ note: PRIORITY must be anywhere from A to Z."
             # put symbold in global vars so consistent TODO, color this based on priority
             # now that we've removed id from title, i've had to do some jugglery to switch cols
 "quick" | "q" ) # COMMAND a quick report showing status and title sorted on status
-        stime=$SECONDS
-        opt_fields=${opt_fields:-"1,2,4,8,9"}
-        opt_postsort=${opt_postsort:-"1,1 -k3,4"}
-        START=$(date +%s.%N)
+        opt_fields=${opt_fields:-"1,2,4,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
+        opt_postsort=${opt_postsort:-"2,2 -k3,4"}
         short_title
-        #formatted_tsv_headers | cut -d '|' -f$opt_fields
-        cut -f$opt_fields "$TSV_FILE" | \
-        sed -e "s/^\(....\)${DELIM}\(...\)/\2\1/" \
-        -e "s/${DELIM} $//" \
-        -e "s/${DELIM}\(([0-9]\{1,\})\)$/ \1/" \
-        -e 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g'  \
-        -e 's/BUG/#/g;s/ENH/./g;s/FEA/./g;s/TAS/,/g;' | \
-        sort -k$opt_postsort | \
-        color_by_priority  | \
-        pretty_print
+        generic_report
+            ;;
 
+"lastmodified" | "lm" ) # COMMAND a quick report showing status and title sorted on status
+        opt_fields=${opt_fields:-"1,2,3,4,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
+        #opt_postsort=${opt_postsort:-"$TSV_MODIFIED_COLUMN1 -r"}
+        opt_sort=${opt_sort:-"$TSV_MODIFIED_COLUMN1 -r"}
+        _list "$@"
         legend
-        #show_source
-        stime2=$SECONDS
-        END=$(date +%s.%N)
-        #echo $(( stime2 - stime )) " seconds"
-        DIFF=$(echo "$END - $START" | bc)
-        echo $DIFF " seconds."
             ;;
 
 "grep" ) # COMMAND uses egrep to run a quick report showing status and title sorted on status
             regex="$@"
             [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: grep : $@"
-            short_title
-            egrep "$@" "$TSV_FILE" | cut -f1,2,4,8  | \
-            sed -e  "s/^\(....\)${DELIM}\(...\)/\2\1/" \
-            -e  's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g'  \
-            -e 's/BUG/#/g;s/ENH/ /g;s/FEA/ /g;s/TAS/./g;' | \
-            sort -k1,1 | pretty_print
+    #        short_title
+            echo "  Id  | B |      Title                                   "
+            echo "------+---+------------------------------------------------------"
+    FLAG=""
+    filter=${@:-"."}
+    [[ ${filter:0:1} == "-" ]] && {
+       FLAG="-v"
+       filter=${filter:1}
+    }
+    egrep $FLAG "$filter" "$TSV_FILE" \
+    | cut -f1,2,4,$TSV_TITLE_COLUMN1  \
+    | sed -e  "s/^\(....\)${DELIM}\(...\)/\2\1/" \
+          -e  's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g'  \
+          -e  's/BUG/#/g;s/ENH/ /g;s/FEA/ /g;s/TAS/./g;'  \
+    | sort -k1,1 \
+    | pretty_print
 #        show_source
+   legend
             ;;
 
 "newest" ) # COMMAND a quick report showing  newest <n> items added
         count=${1:-10}
+        echo 
+        echo "   --- Newest $count issues  ---"
+        echo 
         tail -${count} "$TSV_FILE" | \
-        cut -f1,2,6,8  | \
+        cut -f1,2,4,6,$TSV_TITLE_COLUMN1  | \
         sed "s/^\(....\)${DELIM}\(...\)/\2\1/"| \
         sed 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g' | \
         color_by_priority
+        legend
         show_source
             ;;
 
 "oldest" ) # COMMAND a quick report showing  oldest <n> items added
         count=${1:-10}
+        echo 
+        echo "   --- Oldest open/started $count issues  ---"
+        echo 
         egrep "${DELIM}OPE${DELIM}|${DELIM}STA${DELIM}" "$TSV_FILE" | \
         head -${count}  | \
-        cut -f1,2,6,8  | \
+        cut -f1,2,4,6,$TSV_TITLE_COLUMN1  | \
         sed "s/^\(....\)${DELIM}\(...\)/\2\1/"| \
         sed 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g' | \
         color_by_priority
+        legend
         show_source
             ;;
 
 "tag" ) # COMMAND: adds a tag at end of title, with '@' prefixed, helps in searching.
- # TODO XXX tag added after comment !!!
+ 
             tag="@$1"
             errmsg="usage: $TSV_PROGNAME $action TAG ITEM#"
             [ -z "$1" ] && die "Tag required. $errmsg"
