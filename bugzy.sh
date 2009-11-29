@@ -48,7 +48,8 @@ TSV_ASSIGNED_TO_COLUMN1=5
 TSV_DATE_CREATED_COLUMN1=6
 TSV_DUE_DATE_COLUMN1=7
 TSV_TITLE_COLUMN1=8
-
+TSV_COMMENT_COUNT_COLUMN1=9
+TSV_MODIFIED_COLUMN1=10
 TSV_TITLE_COLUMN0=7
 TSV_STATUS_COLUMN0=1
 
@@ -1378,8 +1379,11 @@ select_row(){
     G_ROWDATA="$rowdata"
 } 
 ## updates the row back to the table
+# TODO add modified time in epoch after title 9th pos
 update_row(){
     [ -z "$KEY" ] && { echo "update_row key blank."; exit 1; }
+    local seconds=$( date +%s )
+    F[$TSV_MODIFIED_COLUMN1]=$seconds
     convert_array_to_row
     sed -i.bak "/^$KEY/s/.*/$G_NEWROW/" data.tsv
     echo "updated $KEY"
@@ -1866,6 +1870,7 @@ done # while true
 ## sub-options: --sort  - a field number to sort on, default 3. e.g. --sort:"2 -r"
 ##              --sort sorts on original field list, so as to continue sorting on SEVERITY
 ##+               even after the fields are reduced
+    opt_fields=${opt_fields:-"1-9"}
     if [ -z "$opt_fields" ]; then
         formatted_tsv_headers
     else
@@ -1875,7 +1880,7 @@ done # while true
         opt_sort=$TSV_SEVERITY_COLUMN1
     fi
     data=$( 
-    sort -t$'\t' -k$opt_sort "$TSV_FILE" | \
+    sort -t$'\t' -k$opt_sort "$TSV_FILE" |cut -d $'\t' -f$opt_fields | \
         sed -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
             -e  "/${DELIM}CRI${DELIM}/s/.*/${PRI_A}&${DEFAULT}/" \
             -e  "/${DELIM}MOD${DELIM}/s/.*/${PRI_B}&${DEFAULT}/" \
@@ -1884,7 +1889,7 @@ done # while true
         if [ -z "$opt_fields" ]; then
             echo -e "$data"
         else
-            echo -e "$data"  | cut -d '|' -f$opt_fields
+            echo -e "$data"   
         fi
 
         [ $TSV_VERBOSE_FLAG -gt 1 ] && { echo; echo  "Listing is sorted on field 3. You may reduce fields by using the --fields option. e.g. --fields:\"1,2,3,5,8\""; 
