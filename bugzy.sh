@@ -780,12 +780,12 @@ add_comment_count_to_title(){
     count=$( grep -c "^$item:com:" "$TSV_EXTRA_DATA_FILE" )
     # tsv stuff
     #oldvalue=$( tsv_get_column_value $item "title" )
-    oldvalue="$G_TITLE"
-    newvalue=$( echo "$oldvalue" | sed  -e "s/ ([0-9]*)$//" -e  "s/$/ ($count)/" )
-#    echo "updating title to $newvalue"
+    #oldvalue="$G_TITLE"
+    #newvalue=$( echo "$oldvalue" | sed  -e "s/ ([0-9]*)$//" -e  "s/$/ ($count)/" )
+    #    echo "updating title to $newvalue"
     #tsv_set_column_value $item "title" "$newvalue"
-                   F[ $TSV_TITLE_COLUMN1 ]="$newvalue"
-                   update_row
+    F[ $TSV_COMMENT_COUNT_COLUMN1 ]="($count)"
+    update_row
 #    echo "updated title to $newvalue"
 }
 add_fix(){
@@ -821,8 +821,8 @@ tsv_headers(){
 # gives formatter header for printing
 # see pretty_print
 formatted_tsv_headers(){
-    echo "  Id |Statu|Sever|Type |Assigned To |Date Created|  Due Date  |     Title"
-    echo "-----|-----|-----|-----|------------|------------|------------|-----------------------"
+    echo "   Id |Statu|Sever|Type |Assigned To |Date Created|  Due Date  |     Title"
+    echo "------|-----|-----|-----|------------|------------|------------|-----------------------"
 }
 ## color the given data
 ## please set USE_PRI before calling else it will use $PRI_A
@@ -1785,6 +1785,7 @@ done # while true
 "list" | "ls") # COMMAND: list use -l for details
 ## sub-option: --sort, --fields
 ## b list --fields:"1,2,7,8" --sort:"2,2 -k8,8"
+opt_fields=${opt_fields:-"1-4,6-9"}
        _list "$@"
        cleanup;;
 
@@ -2114,13 +2115,15 @@ note: PRIORITY must be anywhere from A to Z."
             # now that we've removed id from title, i've had to do some jugglery to switch cols
 "quick" | "q" ) # COMMAND a quick report showing status and title sorted on status
         stime=$SECONDS
-        opt_fields=${opt_fields:-"1,2,4,8"}
+        opt_fields=${opt_fields:-"1,2,4,8,9"}
         opt_postsort=${opt_postsort:-"1,1 -k3,4"}
         START=$(date +%s.%N)
         short_title
         #formatted_tsv_headers | cut -d '|' -f$opt_fields
         cut -f$opt_fields "$TSV_FILE" | \
         sed -e "s/^\(....\)${DELIM}\(...\)/\2\1/" \
+        -e "s/${DELIM} $//" \
+        -e "s/${DELIM}\(([0-9]\{1,\})\)$/ \1/" \
         -e 's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g'  \
         -e 's/BUG/#/g;s/ENH/./g;s/FEA/./g;s/TAS/,/g;' | \
         sort -k$opt_postsort | \
@@ -2180,7 +2183,9 @@ note: PRIORITY must be anywhere from A to Z."
             do
                 common_validation $item "$errmsg"
                 ## CAUTION: we are adding to end of row, so if new column is added XXX
-                sed -i.bak "/^$paditem/s/.*/& $tag/" "$TSV_FILE"
+                #sed -i.bak "/^$paditem/s/.*/& $tag/" "$TSV_FILE"
+                F[$TSV_TITLE_COLUMN1]="$G_TITLE $tag"
+                update_row
                 log_changes1 "tag" "#$item tagged with $tag"
                 [ "$?" -eq 0 ] && echo "Tagged $item with $tag";
             done
