@@ -199,7 +199,7 @@ help() # COMMAND: shows help
         qadd TITLE
           (Quickly) add an item passing only title on command-line. All other values will be defaults
 
-        qadd --type:bug --severity:cri --due_date:2009-12-26 "TITLE..."
+        qadd --type=bug --severity=cri --due_date="2009-12-26" "TITLE..."
           (Quickly) add an item passing only title on command-line. You may override defaults for
           type, severity, status and due_date as arguments. No spaces in -- commands.
           
@@ -217,7 +217,7 @@ help() # COMMAND: shows help
         stopped  NUMBER
           change status of given item/s. May also use first 3 characters
 
-        clo --comment:"i am testing a comment from CL" 209
+        clo --comment="i am testing a comment from CL" 209
           change status and add a (related) comment at the same time.
 
         upcoming
@@ -662,7 +662,8 @@ change_status()
 {
     item=$1
     action=$2
-    errmsg="usage: $TSV_PROGNAME $action task#"
+    errmsg= "usage: $TSV_PROGNAME $action  ITEM#"
+    errmsg+="       $TSV_PROGNAME $action [--fix=\"text\"] [--comment=\"text\"] ITEM#"
     common_validation $1 "$errmsg"
     reply="status"; input="$action";
 #    oldvalue=`tsv_get_column_value $item $reply`
@@ -1344,6 +1345,8 @@ getoptlong()
 {
     ## check for -- settings, break into key and value
     ## no spaces, :  used to delimit key and value
+    ## WHY are we using : and not =, is it because of that crappy old file format
+    ## 2009-11-30 11:59 changed sep to =
     #echo "inside getoptl"
     shifted=0
     OPT_PREFIX=${OPT_PREFIX:-opt}
@@ -1351,8 +1354,8 @@ getoptlong()
     do
         if [[ "${1:0:2}" == "--" ]]; then
             f=${1:2}
-            val="${f#*:}"
-            key="${f%:*}"
+            val="${f#*=}"
+            key="${f%=*}"
             # declare will be local when we move this to a function
             #declare i_${key}=$val
             # sorry, in this case we were setting i_ vars
@@ -1365,7 +1368,7 @@ getoptlong()
             break
         fi
     done
-    export long params
+    ##export long params
     [ $shifted -gt 0 ] && export ${!opt_@}
     #what's left, if you want
     i_rest=$*
@@ -1857,7 +1860,7 @@ done # while true
 
 "list" | "ls") # COMMAND: list use -l for details
 ## sub-option: --sort, --fields
-## b list --fields:"1,2,7,8" --sort:"2,2 -k8,8"
+## b list --fields="1,2,7,8" --sort="2,2 -k8,8"
 opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
        _list "$@"
        cleanup;;
@@ -1894,7 +1897,7 @@ opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"
 
 "selectm" | "selm") # COMMAND: allows multiple criteria selection key value
     valid="|status|date_created|severity|type|"
-    errmsg="usage: $TSV_PROGNAME $action \"type: BUG\" \"status: OPE\" ..."
+    errmsg="usage: $TSV_PROGNAME $action \"type=BUG\" \"status=OPE\" ..."
     [ -z "$1" ] && die "$errmsg"
 
     # if you use grep -P then don't escape {
@@ -1947,9 +1950,9 @@ opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"
     # TODO formatting required
     # redo : sort on crit and colorize
 "lbs") # COMMAND: list by severity
-## b lbs --fields:"1,3,4,7,8"
+## b lbs --fields="1,3,4,7,8"
 ## sub-options: --fields  - a field list compatible with cut command
-## sub-options: --sort  - a field number to sort on, default 3. e.g. --sort:"2 -r"
+## sub-options: --sort  - a field number to sort on, default 3. e.g. --sort="2 -r"
 ##              --sort sorts on original field list, so as to continue sorting on SEVERITY
 ##+               even after the fields are reduced
     FLAG=""
@@ -1981,10 +1984,10 @@ opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"
         )
         echo -e "$data"
 
-        [ $TSV_VERBOSE_FLAG -gt 1 ] && { echo; echo  "Listing is sorted on field 3. You may reduce fields by using the --fields option. e.g. --fields:\"1,2,3,5,8\""; 
+        [ $TSV_VERBOSE_FLAG -gt 1 ] && { echo; echo  "Listing is sorted on field 3. You may reduce fields by using the --fields option. e.g. --fields=\"1,2,3,5,8\""; 
         echo
-        echo "To change sort order, use --sort:n"
-        echo "--sort:\"2 -r\""
+        echo "To change sort order, use --sort=n"
+        echo "--sort=\"2 -r\""
         echo "sort field numbers pertain to _original_ field numbers"
     
     }
@@ -2358,7 +2361,7 @@ note: PRIORITY must be anywhere from A to Z."
         echo "tasks        : $tasclo / $tasctr " 
 ;;
 "qadd" ) # COMMAND: quickly add an issue from command line, no prompting
-## b qadd --type:bug --severity:cri --due_date:2009-12-26 "using --params: command upc needs formatting"
+## b qadd --type=bug --severity=cri --due_date=2009-12-26 "using --params= command upc needs formatting"
 # TODO can we start with a priority too?
 # validatoin required. TODO
     i_type=${DEFAULT_TYPE:-"bug"}
