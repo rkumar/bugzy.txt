@@ -3,6 +3,7 @@
 # A simple file based bug tracker                       
 #                                                       
 # 2009-11-24 v0.1.12 - am removing old flat file creation
+# 2009-11-29 v0.1.14 - added modified timestamp and comment count in tsv file
 # rkumar                                                
 # 
 # 
@@ -399,6 +400,11 @@ edit_tmpfile()
                 #echo "$? changed value is:"
                 #cat $TMP_FILE
                 RESULT=1
+                #tr -cd "[:print:]" < $TMP_FILE
+                ## added cleaning of possible non-print chars
+                TMP_FILE2=${TMPDIR:-/tmp}/prog2.$$
+                tr -cd '\12\15\40-\176'  < $TMP_FILE > $TMP_FILE2
+                mv $TMP_FILE2 $TMP_FILE
             else
                 echo "editing cancelled"
                 RESULT=0
@@ -1280,14 +1286,12 @@ create_tsv_file()
     tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$TSV_NOW${del}$i_due_date${del}$tabcommentcount$del$tabtimestamp$del$atitle"
     echo "$tabfields" >> "$TSV_FILE"
     [ -d "$ISSUES_DIR" ] || mkdir "$ISSUES_DIR"
-# stop creating those files
-#      [ ! -z "$i_desc" ] && echo "$i_desc" > $serialid.description.txt
-      # combined file approach
       [ ! -z "$i_desc" ] && {
           i_desc_pref=$( echo "$i_desc" | sed "s/^/$serialid:des:/g" )
           #echo "$serialid:des:$i_desc" >> "$TSV_EXTRA_DATA_FILE"
           echo "$i_desc_pref" >> "$TSV_EXTRA_DATA_FILE"
       }
+      echo "Created $i_type : $serialid"
       [ "$TSV_CREATE_FLAT_FILE" -gt 0 ] && create_flat_file
 }
 # we are no longer creating this.
@@ -1592,7 +1596,8 @@ case $action in
     fi
     #check title for newline at end, this could leave a blank line in file
     [ -z "$atitle" ] && die "Title required for bug"
-    atitle=$( echo "$atitle" | tr -d '\n' )
+    ## added 2009-11-30 10:07 cleaning of input
+    atitle=$( echo "$atitle" | tr -cd '\40-\176' )
     [ "$PROMPT_DESC" == "yes" ] && {
         echo "Enter a description (^D to exit): "
         #read i_desc
@@ -1602,6 +1607,8 @@ case $action in
             i_desc=`cat`
         fi
     }
+    ## added 2009-11-30 10:07 cleaning of input
+    i_desc=$( echo "$i_desc" | tr -cd '\12\15\40-\176' )
     i_type=${DEFAULT_TYPE:-"bug"}
     i_severity=${DEFAULT_SEVERITY:-"normal"}
     i_status=${DEFAULT_STATUS:-"open"}
@@ -2104,17 +2111,19 @@ note: PRIORITY must be anywhere from A to Z."
 "upcoming" | "upc" ) # COMMAND: shows upcoming tasks
             # now check field 7, convert to unix epoch and compare to now, if greater.
             # if less then break out, no more printing
+            ## CAUTION: this checks htat seventh column is due_date, if you change it may
+            ##+ not show any data.
             #tomorrow=`date --date="tomorrow" '+%Y-%m-%d'`
             tomorrow=$( date_calc +1 )
             #| cut -d $'\t' -f$opt_fields \
-            opt_fields=${opt_fields:-"1,2,3,4,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
+            opt_fields=${opt_fields:-"1-7,$TSV_TITLE_COLUMN1"}
 
             echo 
             echo "   ---  Issues with Upcoming due dates --- "
             echo 
             grep -v "${DELIM}CLO${DELIM}" "$TSV_FILE" \
             | sort -t$'\t' -k7 -r  \
-            | cut -d$'\t' -f1-7,10 \
+            | cut -d$'\t' -f1-$TSV_DUE_DATE_COLUMN1,$TSV_TITLE_COLUMN1 \
             | sed -e 's/OPE/-/g;s/CLO/x/g;s/STA/@/g;s/STO/$/g;s/CAN/x/g'  \
             -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
             -e 's/BUG/#/g;s/ENH/./g;s/FEA/./g;s/TAS/,/g;' | \
@@ -2342,7 +2351,7 @@ note: PRIORITY must be anywhere from A to Z."
     do
         read ${OPT_PREFIX}_${arg:4} <<< $( eval 'echo -n "$'$arg' "') 
     done
-    echo "type:$i_type"
+    #echo "type:$i_type"
     #echo "seve:$i_severity"
     #echo "left: $i_rest"
     atitle=$*
@@ -2351,10 +2360,12 @@ note: PRIORITY must be anywhere from A to Z."
     [ -z "$atitle" ] && die "Title required for bug"
     #check title for newline at end, this could leave a blank line in file
     del=$DELIM
-    atitle=$( echo "$atitle" | tr -d '\n' )
+    #atitle=$( echo "$atitle" | tr -d '\n' )
+    ## added 2009-11-30 10:07 cleaning of input
+    atitle=$( echo "$atitle" | tr -cd '\40-\176' )
     [  -z "$i_due_date" ] && i_due_date=" "
     i_due_date=$( printf "%-10s" "$i_due_date" )
-      create_tsv_file
+    create_tsv_file
       [ ! -z "$EMAIL_TO" ] && echo "$tabfields" | tr '\t' '\n' | mail -s "$todo" $EMAIL_TO
       cleanup
       
