@@ -4,6 +4,7 @@
 #                                                       
 # 2009-11-24 v0.1.12 - am removing old flat file creation
 # 2009-11-29 v0.1.14 - added modified timestamp and comment count in tsv file
+# 2009-11-30 v0.1.16 - moved description and fix into tsv 
 # rkumar                                                
 # 
 # 
@@ -51,6 +52,8 @@ TSV_DUE_DATE_COLUMN1=7
 TSV_COMMENT_COUNT_COLUMN1=8
 TSV_MODIFIED_COLUMN1=9
 TSV_TITLE_COLUMN1=10
+TSV_DESCRIPTION_COLUMN1=11
+TSV_FIX_COLUMN1=12
 
 TSV_CREATE_FLAT_FILE=0
 TSV_WRITE_FLAT_FILE=0
@@ -758,11 +761,11 @@ add_ml_comment(){
                     howmanylines=$( echo -e "$input" | wc -cl | tr -s ' ' | sed 's/^ /(/;s/$/)/;s# #/#')
                     loginput=$( echo "$input" | tr '\n' '' )
                     RESULT=1 
-                    ## TODO this should move to update_extra_header
                     # for tsv file
-                    pretext="$item:com:$pretext"
-                    # C-a processing, adding
-                    echo "${pretext}$loginput" >> "$TSV_EXTRA_DATA_FILE"  # this has control A's, so we can pull one line and subst ^A with nl.
+                    #pretext="$item:com:$pretext"
+                    # C-a processing, adding , comment
+                    update_extra_data "$item" "comment" "$pretext$input"
+                    #echo "${pretext}$loginput" >> "$TSV_EXTRA_DATA_FILE"  # this has control A's, so we can pull one line and subst ^A with nl.
 [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && {
 pretext="- $TSV_NOW: "
 text=$( echo "$input" | sed "1s/^/$pretext/g" | sed '2,$s/^/                    \>/g' )
@@ -775,8 +778,8 @@ x
 !
 }
         #log_changes "$reply" "$reply added.${loginput:0:25} ..." "${#loginput} chars" "$file"
-        log_changes1 "$reply" "#$item$reply added.${loginput:0:40} ...$howmanylines" 
-        echo "$reply added to $item"
+        log_changes1 "$reply" "#$item $reply added. ${loginput:0:40} ...$howmanylines" 
+        echo "Comment added to $item"
         [ "$TSV_ADD_COMMENT_COUNT_TO_TITLE" -gt 0 ] && add_comment_count_to_title;
     
 }
@@ -1206,6 +1209,13 @@ get_extra_data(){
     item=$1
     reply=$2 # field name
 
+    case $reply in
+        "fix" | "description" )
+        get_column_index $reply
+        get_column $colindex | tr '' '\n'
+        return
+        ;;
+    esac
     # tsv stuff
     # combined file approach
     regex="^$item:${reply:0:3}" 
@@ -1226,7 +1236,14 @@ update_extra_data(){
     reply=$2
     local text="$3"
     text=$( echo "$text" | tr '\n' '' )
-    i_desc_pref=$( echo "$text" | sed "s/^/$item:${reply:0:3}:/g" )
+   
+    case $reply in
+        "fix" | "description")
+        set_update_row "$reply" "$text"
+        return 0
+        ;;
+    esac
+    i_desc_pref=$( echo "$text" | sed "s/^/$item:${reply:0:3}:/" )
     sed -i.bak "/^$item:${reply:0:3}:/d" "$TSV_EXTRA_DATA_FILE"
     echo "$i_desc_pref" >> "$TSV_EXTRA_DATA_FILE"
 }
@@ -1302,14 +1319,19 @@ create_tsv_file()
     tabcommentcount="   "
     tabtimestamp=$(date +%s)
     TSV_NOW=`date "$TSV_DATE_FORMAT"`
-    tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$TSV_NOW${del}$i_due_date${del}$tabcommentcount$del$tabtimestamp$del$atitle"
+      [  -z "$i_desc" ] && { i_desc=""; }
+      [  -z "$i_fix" ] && { i_fix=""; }
+      # putting desc and fix into main data.tsv
+    tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$TSV_NOW${del}$i_due_date${del}$tabcommentcount$del$tabtimestamp$del$atitle$del$i_desc$del$i_fix"
     echo "$tabfields" >> "$TSV_FILE"
     [ -d "$ISSUES_DIR" ] || mkdir "$ISSUES_DIR"
-      [ ! -z "$i_desc" ] && {
-          i_desc_pref=$( echo "$i_desc" | sed "s/^/$serialid:des:/g" )
+      #[ ! -z "$i_desc" ] && {
+          #i_desc_pref=$( echo "$i_desc" | sed "s/^/$serialid:des:/g" )
           #echo "$serialid:des:$i_desc" >> "$TSV_EXTRA_DATA_FILE"
-          echo "$i_desc_pref" >> "$TSV_EXTRA_DATA_FILE"
-      }
+          # DARN This is supposed to go the C-a way
+          #echo "$i_desc_pref" >> "$TSV_EXTRA_DATA_FILE"
+          #update_extra_data "$item" "description" "$i_desc"
+      #}
       echo "Created $i_type : $serialid"
       [ "$TSV_CREATE_FLAT_FILE" -gt 0 ] && create_flat_file
 }
@@ -1429,7 +1451,15 @@ update_row(){
     local seconds=$( date +%s )
     F[$TSV_MODIFIED_COLUMN1]=$seconds
     convert_array_to_row
-    sed -i.bak "/^$KEY/s/.*/$G_NEWROW/" data.tsv
+    ## sed crashes out if slash etc in text. What other delim can i use that wont be in data
+   # sed -i.bak "/^$KEY/s/.*/$G_NEWROW/" data.tsv
+ex - "$TSV_FILE"<<!
+${lineno}c
+$G_NEWROW
+.
+x
+!
+
     echo "updated $KEY"
 #    diff data.tsv data.tsv.bak
 #    grep "^$KEY" data.tsv
@@ -1458,13 +1488,6 @@ generic_report()
 {
         START=$(date +%s.%N)
         #formatted_tsv_headers | cut -d '|' -f$opt_fields
-    #FLAG=""
-    #filter=${1:-"."}
-    #[[ ${filter:0:1} == "-" ]] && {
-       #FLAG="-v"
-       #filter=${filter:1}
-    #}
-    #grep -E $FLAG "$filter" "$TSV_FILE" \
     filter_data "$@" \
         | cut -f$opt_fields  \
         | sed -e "s/${DELIM} $//" \
@@ -1487,6 +1510,7 @@ filter_data(){
     ## call thusly: filter_data "$@" | cut -fn,m | sed 's//'
     ## file is assumed to be TSV_FILE
 
+    EXTENDED_GREP="-E"
 
     filter_command="${pre_filter_command:-}"
 
@@ -1499,7 +1523,7 @@ filter_data(){
         if [ ${search_term:0:1} == '=' ]
         then
             filter_command="${filter_command:-} ${filter_command:+|} \
-            grep \"${search_term:1}\" "
+            grep $EXTENDED_GREP \"${search_term:1}\" "
         else
             IGNOREFLAG="-i"
             # if a single upper char is found, assume case sensitive
@@ -1509,14 +1533,14 @@ filter_data(){
                 ## First character isn't a dash: hide lines that don't match
                 ## this $search_term
                 filter_command="${filter_command:-} ${filter_command:+|} \
-                grep $IGNOREFLAG \"$search_term\" "
+                grep $EXTENDED_GREP $IGNOREFLAG \"$search_term\" "
             else
                 ## First character is a dash: hide lines that match this
                 ## $search_term
                 #
                 ## Remove the first character (-) before adding to our filter command
                 filter_command="${filter_command:-} ${filter_command:+|} \
-                grep -v $IGNOREFLAG \"${search_term:1}\" "
+                grep $EXTENDED_GREP -v $IGNOREFLAG \"${search_term:1}\" "
             fi
         fi
     done
@@ -1809,7 +1833,7 @@ case $action in
         [ "$input" == "quit" ] && continue;
         longcode=`convert_short_to_long_code $reply $input`
         newcode=`convert_long_to_short_code $input` # not required now since its new code
-        echo "input is $longcode ($newcode)"
+        echo "selected $longcode ($newcode)"
         TSV_NOW=`date "$TSV_DATE_FORMAT"`
         #tsv_set_column_value $item $reply $newcode
         [ "$oldvalue" == "$newcode" ] && { die "$item is already $oldvalue ($longcode)"; }
@@ -2018,7 +2042,6 @@ opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"
     if [ -z "$opt_sort" ]; then
         opt_sort=$TSV_SEVERITY_COLUMN1
     fi
-    #grep -E $FLAG "$filter" "$TSV_FILE" \
     data=$( 
     filter_data "$@" \
         | sort -t$'\t' -k$opt_sort \
@@ -2281,13 +2304,7 @@ note: PRIORITY must be anywhere from A to Z."
     #        short_title
             echo "  Id  | B |      Title                                   "
             echo "------+---+------------------------------------------------------"
-    FLAG=""
-    filter=${@:-"."}
-    [[ ${filter:0:1} == "-" ]] && {
-       FLAG="-v"
-       filter=${filter:1}
-    }
-    egrep $FLAG "$filter" "$TSV_FILE" \
+    filter_data "$@" \
     | cut -f1,2,4,$TSV_TITLE_COLUMN1  \
     | sed -e  "s/^\(....\)${DELIM}\(...\)/\2\1/" \
           -e  's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g'  \
