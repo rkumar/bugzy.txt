@@ -686,8 +686,12 @@ change_status()
         [ ! -z "$EMAIL_TO" ] && echo "#$item changed from $oldvalue to $newcode" | mail -s "[$var] $mtitle" $EMAIL_TO
         #show_diffs 
         [ ! -z "$opt_comment" ] && {
-        echo "Adding comment ($opt_comment) to $item"
+            echo "Adding comment ($opt_comment) to $item"
             add_ml_comment "$opt_comment"
+        }
+        [ ! -z "$opt_fix" ] && {
+            echo "Adding fix ($opt_fix) to $item"
+            append_extra_data $item "fix" "$opt_fix"
         }
 }
 ## for actions that require a bug id
@@ -810,6 +814,24 @@ add_fix(){
         log_changes1 $reply "#$item Fix added $howmanylines. ${text:0:40}..."
         let modified+=1
     }
+}
+## in case of quick entry, where user does not want
+##+ to edit, we just append text
+append_extra_data(){
+    item=$1
+    reply=$2
+    shift 2
+    data="$*"
+    description=$( get_extra_data $item $reply )
+    if [  -z "$description" ]; then
+        description="$data"
+    else
+        description="$description\nEDIT ($TSV_NOW):\n $data"
+    fi
+    
+        update_extra_data $item $reply "$description"
+        log_changes1 $reply "#$item $reply appended. ${description:0:40}..."
+        let modified+=1
 }
 
 ## returns title column, all rows - unused ?
