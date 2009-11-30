@@ -7,9 +7,9 @@
 # rkumar                                                
 # 
 # 
-# TODO - entry of title, check for tab or non-print chars and replace with spaces
 # TODO - how to view archived data
-# CAUTION: we are putting priority at start of title, and tags *and* comment count at end.
+# TODO - should be able to search text in desc, fix and comments
+# CAUTION: we are putting priority at start of title, and tags at end.
 #
 
 #### --- cleanup code use at start ---- ####
@@ -253,7 +253,7 @@ fi
 }
 die()
 {
-    echo "$*"
+    echo -e "$*"
     exit 1
 }
 cleanup()
@@ -457,11 +457,6 @@ _list()
     [ -n "$post_filter_command" ] && {
         filter_command="${filter_command:-}${filter_command:+ | }${post_filter_command:-}"
     }
-    #width=$( tput cols )
-    #let width-=3
-        # cat "$TSV_FILE" \
-        #cut -c1-$width "$TSV_FILE" \
-    pretty_print_headers | cut -d '|' -f$opt_fields
         items=$(
          cat "$TSV_FILE" 
           )
@@ -470,6 +465,7 @@ _list()
     else
         filtered_items=$items
     fi
+    pretty_print_headers | cut -d '|' -f$opt_fields
     opt_fields=${opt_fields:-"1-7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
     opt_sort=${opt_sort:-"1,1"}
 
@@ -661,9 +657,9 @@ tsv_get_title()
 change_status()
 {
     item=$1
-    action=$2
-    errmsg= "usage: $TSV_PROGNAME $action  ITEM#"
-    errmsg+="       $TSV_PROGNAME $action [--fix=\"text\"] [--comment=\"text\"] ITEM#"
+    local action=$2
+    errmsg="usage: $TSV_PROGNAME $action  ITEM#"
+    errmsg+="\n       $TSV_PROGNAME $action [--fix=text] [--comment=text] ITEM#"
     common_validation $1 "$errmsg"
     reply="status"; input="$action";
 #    oldvalue=`tsv_get_column_value $item $reply`
@@ -827,7 +823,7 @@ append_extra_data(){
     if [  -z "$description" ]; then
         description="$data"
     else
-        description="$description\nEDIT ($TSV_NOW):\n $data"
+        description=$( echo -e "$description\nEDIT ($TSV_NOW):\n $data" )
     fi
     
         update_extra_data $item $reply "$description"
@@ -1354,8 +1350,10 @@ getoptlong()
     do
         if [[ "${1:0:2}" == "--" ]]; then
             f=${1:2}
-            val="${f#*=}"
+            #val="${f#*=}"
+            val=$( expr "$f" : '[^=]*=\(.*\)' )
             key="${f%=*}"
+            [ -z "$val" ] && echo "*** Warning. No value found for $key. Use = as delimiter, not space"
             # declare will be local when we move this to a function
             #declare i_${key}=$val
             # sorry, in this case we were setting i_ vars
@@ -1460,14 +1458,14 @@ generic_report()
 {
         START=$(date +%s.%N)
         #formatted_tsv_headers | cut -d '|' -f$opt_fields
-        # TODO How to get a grep in here
-    FLAG=""
-    filter=${1:-"."}
-    [[ ${filter:0:1} == "-" ]] && {
-       FLAG="-v"
-       filter=${filter:1}
-    }
-    grep -E $FLAG "$filter" "$TSV_FILE" \
+    #FLAG=""
+    #filter=${1:-"."}
+    #[[ ${filter:0:1} == "-" ]] && {
+       #FLAG="-v"
+       #filter=${filter:1}
+    #}
+    #grep -E $FLAG "$filter" "$TSV_FILE" \
+    filter_data "$@" \
         | cut -f$opt_fields  \
         | sed -e "s/${DELIM} $//" \
         -e "s/${DELIM}\(([0-9]\{1,\})\)$/ \1/" \
@@ -1484,6 +1482,61 @@ generic_report()
         echo $DIFF " seconds."
 }
 
+filter_data(){
+    ## pipes filtered data (if search criteria are found in args)
+    ## call thusly: filter_data "$@" | cut -fn,m | sed 's//'
+    ## file is assumed to be TSV_FILE
+
+
+    filter_command="${pre_filter_command:-}"
+
+
+    [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: list : $@"
+    for search_term in "$@"
+    do
+    [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: search_term is $search_term "
+        ## See if the first character of $search_term is a = (case sensitive)
+        if [ ${search_term:0:1} == '=' ]
+        then
+            filter_command="${filter_command:-} ${filter_command:+|} \
+            grep \"${search_term:1}\" "
+        else
+            IGNOREFLAG="-i"
+            # if a single upper char is found, assume case sensitive
+            [[ $(echo "$search_term" | grep -c "[[:upper:]]") -gt 0 ]] && IGNOREFLAG=""
+            if [ ${search_term:0:1} != '-' ]
+            then
+                ## First character isn't a dash: hide lines that don't match
+                ## this $search_term
+                filter_command="${filter_command:-} ${filter_command:+|} \
+                grep $IGNOREFLAG \"$search_term\" "
+            else
+                ## First character is a dash: hide lines that match this
+                ## $search_term
+                #
+                ## Remove the first character (-) before adding to our filter command
+                filter_command="${filter_command:-} ${filter_command:+|} \
+                grep -v $IGNOREFLAG \"${search_term:1}\" "
+            fi
+        fi
+    done
+    [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: filter_command is $filter_command "
+
+    ## If post_filter_command is set, append it to the filter_command
+    [ -n "$post_filter_command" ] && {
+        filter_command="${filter_command:-}${filter_command:+ | }${post_filter_command:-}"
+    }
+        #items=$(
+         #cat "$TSV_FILE" 
+          #)
+    if [ "${filter_command}" ]; then
+        #filtered_items=$(echo -ne "$items" | eval ${filter_command})
+        cat "$TSV_FILE" | eval ${filter_command}
+    else
+        cat "$TSV_FILE" 
+        #filtered_items=$items
+    fi
+}
 ## ADD FUNCTIONS ABOVE
 out=
 file=
@@ -1947,20 +2000,12 @@ opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"
     
     ;;
 
-    # TODO formatting required
-    # redo : sort on crit and colorize
 "lbs") # COMMAND: list by severity
 ## b lbs --fields="1,3,4,7,8"
 ## sub-options: --fields  - a field list compatible with cut command
 ## sub-options: --sort  - a field number to sort on, default 3. e.g. --sort="2 -r"
 ##              --sort sorts on original field list, so as to continue sorting on SEVERITY
 ##+               even after the fields are reduced
-    FLAG=""
-    filter=${1:-"."}
-    [[ ${filter:0:1} == "-" ]] && {
-       FLAG="-v"
-       filter=${filter:1}
-    }
     echo
     echo " ---   Listing of issues sorted by severity  --- "
     echo
@@ -1973,8 +2018,9 @@ opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"
     if [ -z "$opt_sort" ]; then
         opt_sort=$TSV_SEVERITY_COLUMN1
     fi
+    #grep -E $FLAG "$filter" "$TSV_FILE" \
     data=$( 
-    grep -E $FLAG "$filter" "$TSV_FILE" \
+    filter_data "$@" \
         | sort -t$'\t' -k$opt_sort \
         | cut -d $'\t' -f$opt_fields  \
         | sed -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
@@ -1999,7 +2045,7 @@ opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"
     for item in "$@"
     do
         #item=$1
-        change_status $item "$action"
+        change_status "$item" "$action"
     done
     cleanup
         ;;
@@ -2405,7 +2451,6 @@ note: PRIORITY must be anywhere from A to Z."
     grep ':com:' "$TSV_EXTRA_DATA_FILE"| tail | cut -d : -f1,3- | sed 's/:/ | /1;s/~/ | /' | sed "s//   /g;" | tr '' '\n'
     ;;
 "delcomment" ) # COMMAND: delete a given comment from an item
-# TODO update comment count in title UGH
     errmsg="usage: $TSV_PROGNAME $action item# comment#"
     item=$1
     common_validation $1 $errmsg 
