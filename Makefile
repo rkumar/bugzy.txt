@@ -1,4 +1,4 @@
-DISTFILES := bugzy.cfg README.markdown
+DISTFILES := bugzy.cfg README.markdown 
 #VERSION := 0.1.3
 VERSION := `cat VERSION_FILE`
  
@@ -8,7 +8,9 @@ DISTNAME=bugzy.txt-$(VERSION)
 dist: $(DISTFILES) bugzy.sh
 	echo "ver: $(VERSION)"
 	mkdir -p $(DISTNAME)
+	mkdir -p $(DISTNAME)/addons
 	cp -f $(DISTFILES) $(DISTNAME)/
+	cp -f addons/* $(DISTNAME)/addons
 	sed -e 's/@REVISION@/'$(VERSION)'/' bugzy.sh > $(DISTNAME)/bugzy.sh
 	tar cf $(DISTNAME).tar $(DISTNAME)/
 	gzip -f -9 $(DISTNAME).tar
