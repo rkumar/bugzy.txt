@@ -10,6 +10,8 @@ priority, assigned to, multiple comments, fix/resolution, various statuses.
 All modifications are logged.
 Mails are sent using the 'mail' command if specified.
 
+I am making structure changes. Hold on a day or so.
+
 Downloads
 ---------
 
@@ -100,6 +102,9 @@ sorted above. "depri" removes priority.
 
 "delcomment" item# comment#            # delete comment from an item
 
+"lbs"        # list by severity
+        b lbs --fields:"1,3,4,7,8"   # display only given fields
+
 **Add-ons** include `mdel`, `mpri`, `mdepri` which do multiple deletes or
 priority setting and unsetting.
 
@@ -134,6 +139,10 @@ You may also alias bugzy to "b" in ~/.bashrc or equivalent.
      b help   # longer help
 
  
+Screenshots
+-----------
+
+[Quick report](http://i47.tinypic.com/6s4291.jpg)
 
 Others
 ------
