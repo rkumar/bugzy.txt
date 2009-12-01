@@ -5,6 +5,7 @@
 # 2009-11-24 v0.1.12 - am removing old flat file creation
 # 2009-11-29 v0.1.14 - added modified timestamp and comment count in tsv file
 # 2009-11-30 v0.1.16 - moved description and fix into tsv 
+# 2009-12-01 v0.1.16 - separated log and comments
 # rkumar                                                
 # 
 # 
