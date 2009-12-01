@@ -1840,6 +1840,7 @@ case $action in
                 [ ! -d "$DELETED_DIR" ] && mkdir "$DELETED_DIR";
                 # tsv stuff
                 tsv_delete_item $item
+                log_changes1 "delete" "#$item deleted"
                 [ ! -z "$EMAIL_TO" ] && echo -e "$body" | mail -s "[DEL] $mtitle" $EMAIL_TO
                 [ $TSV_VERBOSE_FLAG -gt 0 ] && echo "Bugzy: '$mtitle' deleted."
                 cleanup
