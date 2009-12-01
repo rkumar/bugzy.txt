@@ -555,7 +555,7 @@ log_changes1()
     local dlim="~"
     TSV_NOW=`date "$TSV_DATE_FORMAT"`
     [ -z "$KEY" ] && die "log_changes1: KEY blank"
-    #[ -z "$key" ] && die "key blank"
+    [ -z "$key" ] && die "log_c: key blank"
     #[ -z "$oldvalue" ] && die "oldvalue blank"
     #[ -z "$newline" ] && die "newline blank"
     #[ -z "$file" ] && die "flat file name blank"
@@ -563,7 +563,7 @@ log_changes1()
     data=$( echo -en "$logtext" | tr '\n' ' ')
     # combined file, log in another file ?
     #echo "$item:log:$key:$TSV_NOW${dlim}$data" >> "$TSV_EXTRA_DATA_FILE"
-    echo "$KEY${DELIM}$TSV_NOW${dlim}$data" >> "$TSV_LOG_FILE"
+    echo "$KEY${DELIM}$key${DELIM}$TSV_NOW${dlim}$data" >> "$TSV_LOG_FILE"
     [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && echo "$data" >> $file
 
 }
@@ -1016,6 +1016,7 @@ tsv_delete_item(){
 }
     
 tsv_delete_other_files(){
+    ## we only delete comments, not logs
     item=$1
     RESULT=0
 
@@ -1231,7 +1232,8 @@ get_extra_data(){
         "log" )
         # readlog
             #grep "^$KEY" "$TSV_COMMENTS_FILE"  | cut -d$'\t' -f2- | tr '' '\n'
-            grep "^$KEY" "$TSV_LOG_FILE"  | cut -d$'\t' -f2- | sed 's/^[^:]*:/On /;s/~/, /1;' |  tr '' ' ' 
+            #grep "^$KEY" "$TSV_LOG_FILE"  | cut -d$'\t' -f3- | sed 's/^[^:]*:/On /;s/~/, /1;' |  tr '' ' ' 
+            grep "^$KEY" "$TSV_LOG_FILE"  | cut -d$'\t' -f3- | sed 's/^/On /;s/~/, /1;' |  tr '' ' ' 
             return
         ;;
     esac
