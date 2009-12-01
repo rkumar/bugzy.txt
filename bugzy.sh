@@ -1361,6 +1361,7 @@ create_tsv_file()
           #update_extra_data "$item" "description" "$i_desc"
       #}
       echo "Created $i_type : $serialid"
+      log_changes1 "create" "#$item created. ($tabtype, $atitle)"
       [ "$TSV_CREATE_FLAT_FILE" -gt 0 ] && create_flat_file
 }
 # we are no longer creating this.
@@ -1524,7 +1525,7 @@ generic_report()
         -e "s/${DELIM}\(([0-9]\{1,\})\)$/ \1/" \
         -e 's/OPE/-/;s/CLO/x/;s/STA/@/;s/STO/$/;s/CAN/x/'  \
         -e 's/BUG/#/;s/ENH/./;s/FEA/./;s/TAS/,/;'  \
-        | sort -k$opt_postsort  \
+        | sort -t$'\t' -k$opt_postsort  \
         | color_by_priority   \
         | pretty_print
 
@@ -1545,10 +1546,10 @@ filter_data(){
     filter_command="${pre_filter_command:-}"
 
 
-    [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: list : $@"
+    [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: list : $@" >&2
     for search_term in "$@"
     do
-    [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: search_term is $search_term "
+    [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: search_term is $search_term " >&2
         ## See if the first character of $search_term is a = (case sensitive)
         if [ ${search_term:0:1} == '=' ]
         then
@@ -1574,7 +1575,7 @@ filter_data(){
             fi
         fi
     done
-    [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: filter_command is $filter_command "
+    [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: filter_command is $filter_command " >&2
 
     ## If post_filter_command is set, append it to the filter_command
     [ -n "$post_filter_command" ] && {
@@ -2340,7 +2341,7 @@ note: PRIORITY must be anywhere from A to Z."
             # now that we've removed id from title, i've had to do some jugglery to switch cols
 "quick" | "q" ) # COMMAND a quick report showing status and title sorted on status
         opt_fields=${opt_fields:-"1,2,4,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
-        opt_postsort=${opt_postsort:-"2,2 -k3,4"}
+        opt_postsort=${opt_postsort:-"2,2 -k5,5"}
         short_title
         generic_report "$@"
             ;;
@@ -2526,7 +2527,18 @@ note: PRIORITY must be anywhere from A to Z."
     # TODO, we should show the title too , somehow
     # silly sed does not respect tab or newline, gsed does. So I went through some hoops to indent comment
     #grep ':com:' "$TSV_EXTRA_DATA_FILE"| tail | cut -d : -f1,3- | sed 's/:/ | /1;s/~/ | /' | sed "s//   /g;" | tr '' '\n'
-    tail -25 "$TSV_COMMENTS_FILE" | sed "s//   /g;" | tr '' '\n'
+    #tail -25 "$TSV_COMMENTS_FILE" | sed "s//   /g;" | tr '' '\n'
+     tail -25 "$TSV_COMMENTS_FILE" \
+     | sed "s//   /g;" \
+     | while read LINE; 
+       do item=$( echo "$LINE" |cut -d$'\t' -f1 ); 
+           paditem=$( printf "%4s" $item )
+           title=$( grep "^$paditem" data.tsv | cut -d$'\t' -f1,10;)
+           echo
+           text=$( echo -e $PRI_B"$title"$DEFAULT )
+           echo -e "--- $text ---"
+           echo "$LINE"| tr '' '\n'; 
+       done
     ;;
 "delcomment" ) # COMMAND: delete a given comment from an item
     errmsg="usage: $TSV_PROGNAME $action item# comment#"
