@@ -27,7 +27,9 @@ arg0=$(basename "$0")
 
 TSV_FILE="data.tsv"
 TSV_EXTRA_DATA_FILE="ext.txt"
-TSV_ARCHIVE_FILE="archive.txt"
+TSV_COMMENTS_FILE="bcomment.tsv"
+TSV_LOG_FILE="blog.tsv"
+TSV_ARCHIVE_FILE="archived.txt"
 #TSV_TITLES_FILE="titles.tsv"
 # what fields are we to prompt for in mod
 TSV_EDITFIELDS="title description status severity type assigned_to due_date comment fix"
@@ -427,7 +429,6 @@ _list()
     filter_command="${pre_filter_command:-}"
 
 
-    # TODO : can we reuse this block for other queries lke quick
     [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: list : $@"
     for search_term in "$@"
     do
@@ -472,8 +473,10 @@ _list()
     opt_fields=${opt_fields:-"1-7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
     opt_sort=${opt_sort:-"1,1"}
 
+    #the next line was resulting in newline creating trouble
+    #echo -ne "$filtered_items" |\
     filtered_items=$(
-    echo -ne "$filtered_items" |\
+    echo -n "$filtered_items" |\
     sort -t$'\t' -k$opt_sort |\
     cut -f$opt_fields |\
     pretty_print)
@@ -485,6 +488,7 @@ _list()
         IFS=$'\n'
         for row in $( echo "$filtered_items" )
         do
+            # CAUTION, the e in echo can cause problems if \n in description
             echo -ne "$row\n"
             rowitem=$( echo -e "$row" | cut -d $'|' -f1 )
             rowitem=${rowitem// /}
@@ -550,14 +554,16 @@ log_changes1()
     #local file=$4
     local dlim="~"
     TSV_NOW=`date "$TSV_DATE_FORMAT"`
-    [ -z "$key" ] && die "key blank"
+    [ -z "$KEY" ] && die "log_changes1: KEY blank"
+    #[ -z "$key" ] && die "key blank"
     #[ -z "$oldvalue" ] && die "oldvalue blank"
     #[ -z "$newline" ] && die "newline blank"
     #[ -z "$file" ] && die "flat file name blank"
     #data="- LOG${dlim}$TSV_NOW${dlim}$key${dlim}$oldvalue${dlim}$newline"
     data=$( echo -en "$logtext" | tr '\n' ' ')
     # combined file, log in another file ?
-    echo "$item:log:$key:$TSV_NOW${dlim}$data" >> "$TSV_EXTRA_DATA_FILE"
+    #echo "$item:log:$key:$TSV_NOW${dlim}$data" >> "$TSV_EXTRA_DATA_FILE"
+    echo "$KEY${DELIM}$TSV_NOW${dlim}$data" >> "$TSV_LOG_FILE"
     [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && echo "$data" >> $file
 
 }
@@ -703,6 +709,7 @@ common_validation()
     saved_item=$item
     # added paditem, so we don't need to keep doing it. 2009-11-20 19:37 
     paditem=$( printf "%4s" $item )
+    KEY="$paditem"
     shift
     local errmsg="$*"
 
@@ -714,7 +721,7 @@ common_validation()
     # tsv stuff
 #    lineno=`tsv_lineno $item`
  ## sets rowdata and lineno
-    tsv_get_rowdata_with_lineno $item
+    tsv_get_rowdata_with_lineno "$KEY"
 
     ## creates rowarr
     convert_row_to_array
@@ -785,7 +792,8 @@ x
 }
 } # add_ml
 add_comment_count_to_title(){
-    count=$( grep -c "^$item:com:" "$TSV_EXTRA_DATA_FILE" )
+    #count=$( grep -c "^$item:com:" "$TSV_EXTRA_DATA_FILE" )
+    count=$( grep -c "^$KEY" "$TSV_COMMENTS_FILE" )
     # tsv stuff
     #oldvalue=$( tsv_get_column_value $item "title" )
     #oldvalue="$G_TITLE"
@@ -829,9 +837,9 @@ append_extra_data(){
         description=$( echo -e "$description\nEDIT ($TSV_NOW):\n $data" )
     fi
     
-        update_extra_data $item $reply "$description"
-        log_changes1 $reply "#$item $reply appended. ${description:0:40}..."
-        let modified+=1
+    update_extra_data $item $reply "$description"
+    log_changes1 $reply "#$item $reply appended. ${data:0:40}..."
+    let modified+=1
 }
 
 ## returns title column, all rows - unused ?
@@ -945,11 +953,10 @@ tsv_get_rowdata(){
 ## Do not call with $() or ``. This does not return values
 ## 
 tsv_get_rowdata_with_lineno(){
-    item="$1"
-    paditem=$( printf "%4s" $item )
-    KEY=$paditem
-    rowdata=$( grep -n "^$paditem" "$TSV_FILE" )
-    [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; return 99;}
+    local key="$1" # padded
+    #paditem=$( printf "%4s" $item )
+    rowdata=$( grep -n "^$key" "$TSV_FILE" )
+    [ -z "$rowdata" ] && { echo "ERROR ITEMNO ($1)"; return 99;}
     lineno=${rowdata%%:*}
     rowdata=${rowdata#*:}
     G_LINENO=$lineno
@@ -1013,8 +1020,10 @@ tsv_delete_other_files(){
     RESULT=0
 
     # delete files from here
-    grep "^$item:" "$TSV_EXTRA_DATA_FILE" >> deleted.extra.txt
-    sed -i.bak "/^$item:/d" "$TSV_EXTRA_DATA_FILE"
+    #grep "^$item:" "$TSV_EXTRA_DATA_FILE" >> deleted.extra.txt
+    #sed -i.bak "/^$item:/d" "$TSV_EXTRA_DATA_FILE"
+    grep "^$KEY" "$TSV_COMMENTS_FILE" >> deleted.comments.txt
+    sed -i.bak "/^$KEY/d" "$TSV_COMMENTS_FILE"
     return $?
 }
 ## updates tsv row with data for given
@@ -1211,9 +1220,19 @@ get_extra_data(){
 
     case $reply in
         "fix" | "description" )
-        get_column_index $reply
-        get_column $colindex | tr '' '\n'
-        return
+            get_column_index $reply
+            get_column $colindex | tr '' '\n'
+            return
+        ;;
+        "comment" )
+            grep "^$KEY" "$TSV_COMMENTS_FILE"  | cut -d$'\t' -f2- | tr '' '\n'
+            return
+        ;;
+        "log" )
+        # readlog
+            #grep "^$KEY" "$TSV_COMMENTS_FILE"  | cut -d$'\t' -f2- | tr '' '\n'
+            grep "^$KEY" "$TSV_LOG_FILE"  | cut -d$'\t' -f2- | sed 's/^[^:]*:/On /;s/~/, /1;' |  tr '' ' ' 
+            return
         ;;
     esac
     # tsv stuff
@@ -1242,10 +1261,14 @@ update_extra_data(){
         set_update_row "$reply" "$text"
         return 0
         ;;
+        "comment" )
+            echo "$KEY$DELIM$text" >> "$TSV_COMMENTS_FILE"
+        return 0
+        ;;
     esac
-    i_desc_pref=$( echo "$text" | sed "s/^/$item:${reply:0:3}:/" )
-    sed -i.bak "/^$item:${reply:0:3}:/d" "$TSV_EXTRA_DATA_FILE"
-    echo "$i_desc_pref" >> "$TSV_EXTRA_DATA_FILE"
+    #i_desc_pref=$( echo "$text" | sed "s/^/$item:${reply:0:3}:/" )
+    #sed -i.bak "/^$item:${reply:0:3}:/d" "$TSV_EXTRA_DATA_FILE"
+    #echo "$i_desc_pref" >> "$TSV_EXTRA_DATA_FILE"
 }
 
 ## colors data passed in based on priority
@@ -1320,7 +1343,9 @@ create_tsv_file()
     tabtimestamp=$(date +%s)
     TSV_NOW=`date "$TSV_DATE_FORMAT"`
       [  -z "$i_desc" ] && { i_desc=""; }
+      i_desc=$( echo "$i_desc" | tr '\n' '' )
       [  -z "$i_fix" ] && { i_fix=""; }
+      i_fix=$( echo "$i_fix" | tr '\n' '' )  # for future in case
       # putting desc and fix into main data.tsv
     tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$TSV_NOW${del}$i_due_date${del}$tabcommentcount$del$tabtimestamp$del$atitle$del$i_desc$del$i_fix"
     echo "$tabfields" >> "$TSV_FILE"
@@ -1453,6 +1478,7 @@ update_row(){
     convert_array_to_row
     ## sed crashes out if slash etc in text. What other delim can i use that wont be in data
    # sed -i.bak "/^$KEY/s/.*/$G_NEWROW/" data.tsv
+    [ -z "$lineno" ] && { echo "update_row lineno blank."; exit 1; }
 ex - "$TSV_FILE"<<!
 ${lineno}c
 $G_NEWROW
@@ -1470,6 +1496,7 @@ get_column_index(){
     local fieldname="$1"
     local upperc=$( echo $fieldname | tr '[:lower:]' '[:upper:]' )
     local v="TSV_${upperc}_COLUMN1"
+    [ -z "$v" ] && die "Darn! Yet another programmer error! get_column_index crashes on $fieldname, $v"
     #echo "v is $v"
     colindex="${!v}"
     #echo "colindex for $fieldname is $colindex"
@@ -1688,6 +1715,29 @@ shift
 case $action in
     "print" ) # COMMAND: print details of one item
     print_item $1
+    ;;
+"desc" ) # COMMAND: add comment to description
+    errmsg="usage: $TSV_PROGNAME $action task# [text]"
+    item=$1
+    common_validation "$1" "$errmsg"
+    if [[ -z "$2" ]]; then
+        #echo -n "Enter a short title/subject: "
+        #read atitle
+        echo "Enter a description (^D to exit): "
+        #read i_desc
+        if which rlwrap > /dev/null; then 
+            i_desc=$( rlwrap cat )
+        else
+            i_desc=`cat`
+        fi
+    ## added 2009-11-30 10:07 cleaning of input
+    else
+        shift
+        i_desc=$*
+    fi
+    [ -z "$i_desc" ] && die "Nothing entered."
+    i_desc=$( echo "$i_desc" | tr -cd '\12\15\40-\176' )
+    append_extra_data "$item" "description" "$i_desc"
     ;;
 "add" | "a") # COMMAND: add an item (bug/task/enhancement)
     if [[ -z "$1" ]]; then
@@ -2269,12 +2319,12 @@ note: PRIORITY must be anywhere from A to Z."
                 for f in $toarch
                 do
                     echo "$f"
-                    grep "^$f" ext.txt >> archive.ext.txt
-                    sed -i.bak "/^$f/d" "$TSV_EXTRA_DATA_FILE"
+                    #grep "^$f" ext.txt >> archive.ext.txt
+                    #sed -i.bak "/^$f/d" "$TSV_EXTRA_DATA_FILE"
                     #sed "/^$f/!d" "$TSV_EXTRA_DATA_FILE"
-                    #[ -f "$f.txt" ] && mv "$f.txt" archived/
-                    #mv $f.*.txt archived/  > /dev/null 2>&1
-                    #rm $f.*bak  > /dev/null 2>&1
+                    paditem=$( printf "%4s" $f )
+                    grep "^$paditem" "$TSV_COMMENTS_FILE" >> archived.comments.txt
+                    sed -i.bak "/^$paditem/d" "$TSV_COMMENTS_FILE"
                 done
             else 
                 echo "nothing to archive";
@@ -2460,12 +2510,14 @@ note: PRIORITY must be anywhere from A to Z."
 ;;
 "recentlog" | "rl") # COMMAND: list recent logs
     # TODO, we should show the title too , somehow
-    grep ':log:' "$TSV_EXTRA_DATA_FILE" | tail -25 | cut -d : -f1,4- | sed 's/:/ | /1;s/~/ | /'
+    #grep ':log:' "$TSV_EXTRA_DATA_FILE" | tail -25 | cut -d : -f1,4- | sed 's/:/ | /1;s/~/ | /'
+    tail -25 "$TSV_LOG_FILE" | cut -d $'\t' -f1,3- | sed 's/~/ | /'
     ;;
 "recentcomment" | "rc" ) # COMMAND: list recent comments 
     # TODO, we should show the title too , somehow
     # silly sed does not respect tab or newline, gsed does. So I went through some hoops to indent comment
-    grep ':com:' "$TSV_EXTRA_DATA_FILE"| tail | cut -d : -f1,3- | sed 's/:/ | /1;s/~/ | /' | sed "s//   /g;" | tr '' '\n'
+    #grep ':com:' "$TSV_EXTRA_DATA_FILE"| tail | cut -d : -f1,3- | sed 's/:/ | /1;s/~/ | /' | sed "s//   /g;" | tr '' '\n'
+    tail -25 "$TSV_COMMENTS_FILE" | sed "s//   /g;" | tr '' '\n'
     ;;
 "delcomment" ) # COMMAND: delete a given comment from an item
     errmsg="usage: $TSV_PROGNAME $action item# comment#"
@@ -2477,7 +2529,8 @@ note: PRIORITY must be anywhere from A to Z."
     [ "$number" -lt 1 ] && die "Comment number should be 1 or more. $errmsg"
     unumber=$number
     number=$(( $number-1 ))
-    OLDIFS="$IFS"; IFS=$'\n';declare -a comments=( $(grep "^${item}:com" "$TSV_EXTRA_DATA_FILE") );IFS="$OLDIFS"
+    #OLDIFS="$IFS"; IFS=$'\n';declare -a comments=( $(grep "^${item}:com" "$TSV_EXTRA_DATA_FILE") );IFS="$OLDIFS"
+    OLDIFS="$IFS"; IFS=$'\n';declare -a comments=( $(grep "^${KEY}" "$TSV_COMMENTS_FILE") );IFS="$OLDIFS"
     row=${comments[$number]}
     [ -z "$row" ] && die "No such comment. Highest is ${#comments[@]}"
     echo -e "\nThe comment is:\n"
@@ -2492,7 +2545,7 @@ note: PRIORITY must be anywhere from A to Z."
         ANSWER="y"
     fi
     if [ "$ANSWER" = "y" ]; then
-        sed -i.bak "/$row/d" "$TSV_EXTRA_DATA_FILE"
+        sed -i.bak "/$row/d" "$TSV_COMMENTS_FILE"
         [ $TSV_VERBOSE_FLAG -gt 0 ] && echo "Bugzy: '$short_row' deleted."
         [ "$TSV_ADD_COMMENT_COUNT_TO_TITLE" -gt 0 ] && add_comment_count_to_title;
         [ ! -z "$EMAIL_TO" ] && echo -e "$frow" | mail -s "[DELCOMM] $item ($unumber) $short_row" $EMAIL_TO
