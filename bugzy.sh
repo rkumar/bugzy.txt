@@ -83,7 +83,7 @@ shorthelp()
         add|a "Fix calculation in +project @context"
         archive|ar
         comment|addcomment NUMBER
-        #command [ACTIONS] TODO
+        #command [ACTIONS] 
         del|rm NUMBER 
         dp|depri NUMBER
         fix|addfix
@@ -1119,6 +1119,7 @@ print_item(){
         do
             description=$( get_extra_data $item $xfile )
             [ ! -z "$description" ] && { 
+            [ "$xfile" == "log" ] && xfile="change log";
             xxfile=$( printf "%-13s" "$xfile" )
             #row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
             row=$( echo -e "$xxfile: " )
@@ -1743,17 +1744,17 @@ case $action in
     ;;
 "add" | "a") # COMMAND: add an item (bug/task/enhancement)
     if [[ -z "$1" ]]; then
-        echo -n "Enter a short title/subject: "
+        echo -n "Enter a short summary: "
         read atitle
     else
         atitle=$*
     fi
     #check title for newline at end, this could leave a blank line in file
-    [ -z "$atitle" ] && die "Title required for bug"
+    [ -z "$atitle" ] && die "Summary required for bug"
     ## added 2009-11-30 10:07 cleaning of input
     atitle=$( echo "$atitle" | tr -cd '\40-\176' )
     [ "$PROMPT_DESC" == "yes" ] && {
-        echo "Enter a description (^D to exit): "
+        echo "Enter a detailed description (^D to exit): "
         #read i_desc
         if which rlwrap > /dev/null; then 
             i_desc=$( rlwrap cat )
@@ -2143,7 +2144,7 @@ note: PRIORITY must be anywhere from A to Z."
         #tsv_set_column_value $item "title" "$newvalue"
                    F[ $TSV_TITLE_COLUMN1 ]="$newvalue"
                    update_row
-        log_changes1 "priority" "#$item priority set to $newvalue"
+        log_changes1 "priority" "#$item priority set to $newpri ($newvalue)"
         [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed  -i.bak -e "/^title: /s/(.)//" -e  "s/^\(title: \)/\1($newpri) /" $file
         cleanup
         ;;
@@ -2157,7 +2158,7 @@ note: PRIORITY must be anywhere from A to Z."
         #tsv_set_column_value $item "title" "$newvalue"
                    F[ $TSV_TITLE_COLUMN1 ]="$newvalue"
                    update_row
-        log_changes1 "priority" "#$item priority removed"
+        log_changes1 "priority" "#$item priority removed ($newvalue)"
         [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed  -i.bak -e "/^title: /s/(.)//" $file
         #show_diffs 
         cleanup
@@ -2216,6 +2217,7 @@ note: PRIORITY must be anywhere from A to Z."
         do
             description=$( get_extra_data $item $xfile )
             [ ! -z "$description" ] && { 
+            [ "$xfile" == "log" ] && xfile="change log";
             xxfile=$( printf "%-13s" "$xfile" )
             row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
             echo -e "$row"
@@ -2441,39 +2443,43 @@ note: PRIORITY must be anywhere from A to Z."
         tasctr=$tasarch
         tasclo=$tasarch
         ctr=0
-        data=$( cut -f2,4 $TSV_FILE)
+        data=$( cut -d$'\t' -f2,4 $TSV_FILE)
+        IFS=$'\n'
         for LINE in $( echo "$data" )
         do
             ((ctr+=1))
         if [[ $LINE =~ BUG ]]
         then
             (( bugctr+=1 ))
-            [[ $LINE =~ CLO ]] &&  (( bugclo+=1 ));
+            [[ $LINE =~ CLO || $LINE =~ CAN ]] &&  (( bugclo+=1 ));
         else
             if [[ $LINE =~ FEA ]]
             then
                 (( feactr+=1 ))
-                [[ $LINE =~ CLO ]] &&  (( feaclo+=1 ));
+                [[ $LINE =~ CLO || $LINE =~ CAN ]] &&  (( feaclo+=1 ));
             else
                 if [[ $LINE =~ ENH ]]
                 then
                     (( enhctr+=1 ))
-                    [[ $LINE =~ CLO ]] &&  (( enhclo+=1 ));
+                    [[ $LINE =~ CLO || $LINE =~ CAN ]] &&  (( enhclo+=1 ));
                 else
                     if [[ $LINE =~ TAS ]]
                     then
                         (( tasctr+=1 ))
-                        [[ $LINE =~ CLO ]] &&  (( tasclo+=1 ));
+                        [[ $LINE =~ CLO || $LINE =~ CAN ]] &&  (( tasclo+=1 ));
                     fi
                 fi
             fi
         fi
         done
         # actually, here we move closed items to archived so usually closed will be zero !!
+        echo
+        echo "               closed  / total   "
         echo "bugs         : $bugclo / $bugctr " 
         echo "enhancements : $enhclo / $enhctr " 
         echo "features     : $feaclo / $feactr " 
         echo "tasks        : $tasclo / $tasctr " 
+        echo
 ;;
 "qadd" ) # COMMAND: quickly add an issue from command line, no prompting
 ## b qadd --type=bug --severity=cri --due_date=2009-12-26 "using --params= command upc needs formatting"
