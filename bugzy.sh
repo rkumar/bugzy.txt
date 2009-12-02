@@ -550,27 +550,6 @@ _list()
 
     fi
 }
-## logging of changes
-## appended to end of file, so log should be last entry
-## i could reverse append it after the log keyword
-log_changes()
-{
-    local key=$1
-    local oldvalue=$2
-    local newline=$3
-    local file=$4
-    local dlim="~"
-    #local now=`date "$TSV_DATE_FORMAT"`
-    [ -z "$key" ] && die "key blank"
-    [ -z "$oldvalue" ] && die "oldvalue blank"
-    [ -z "$newline" ] && die "newline blank"
-    #[ -z "$file" ] && die "flat file name blank"
-    data="- LOG${dlim}$TSV_NOW${dlim}$key${dlim}$oldvalue${dlim}$newline"
-    # combined file, log in another file ?
-    echo "$item:log:$data" >> "$TSV_EXTRA_DATA_FILE"
-    [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && echo "$data" >> $file
-
-}
 log_changes1()
 {
     local key=$1
@@ -594,6 +573,7 @@ log_changes1()
 
 }
 ## get_code "type"
+##+ gets user to input code, returns short version
 get_code()
 {
     RESULT=
@@ -619,6 +599,7 @@ get_code()
 ## get input from user, if user hits enter use default value
 ## user_input "username" "john"
 ## returns value in RESULT
+## now tries to update given variable !
 
 user_input()
 {
@@ -635,7 +616,7 @@ user_input()
     RESULT=$input
 }
 
-
+## converts +n to a date returning result
 convert_due_date()
 {
    local input="$1"
@@ -643,7 +624,7 @@ convert_due_date()
    if [ ${input:0:1} == '+' ];
    then
        input=${input:1}
-       result=$(date --date "$input" "$TSV_DUE_DATE_FORMAT")
+       #result=$(date --date "$input" "$TSV_DUE_DATE_FORMAT")
        result=$(date_calc "$input" "$TSV_DUE_DATE_FORMAT")
    else
        result=$input
@@ -652,7 +633,7 @@ convert_due_date()
 }
 ## 
 ## option, prompt
-## eaxmple:     process_quadoptions  "$SEND_EMAIL" "Send file by email?"
+## example:     process_quadoptions  "$SEND_EMAIL" "Send file by email?"
 process_quadoptions()
 {
     RESULT=""
@@ -688,7 +669,8 @@ tsv_get_title()
         echo "$G_TITLE"
         return 0
     }
-    local mtitle=`tsv_get_rowdata $item | cut -f$TSV_TITLE_COLUMN1 `
+    #local mtitle=`tsv_get_rowdata $item | cut -f$TSV_TITLE_COLUMN1 `
+    local mtitle=`tsv_get_column_value $item "title" `
     echo "$mtitle"
 }
 change_status()
@@ -699,7 +681,6 @@ change_status()
     errmsg+="\n       $TSV_PROGNAME $action [--fix=text] [--comment=text] ITEM#"
     common_validation $1 "$errmsg"
     reply="status"; input="$action";
-#    oldvalue=`tsv_get_column_value $item $reply`
 #    oldvalue=$( get_column $TSV_STATUS_COLUMN1 )
      oldvalue="$G_STATUS"
     var=$( printf "%s" "${action:0:3}" | tr 'a-z' 'A-Z' )
@@ -759,6 +740,8 @@ common_validation()
 }
 
 ## when displaying in columnar, use what widths to pad
+##+ unused but can be used for something else
+
 get_display_widths()
 {
     field="$1"
@@ -772,6 +755,7 @@ get_display_widths()
     esac
 }
 
+## user input for multi-line comment
 add_ml_comment(){
     RESULT=0 
     reply="comment"
@@ -818,18 +802,18 @@ x
     
 }
 } # add_ml
+
+## updates comment count field CC with number of comments
 add_comment_count_to_title(){
     #count=$( grep -c "^$item:com:" "$TSV_EXTRA_DATA_FILE" )
     count=$( grep -c "^$KEY" "$TSV_COMMENTS_FILE" )
     # tsv stuff
-    #oldvalue=$( tsv_get_column_value $item "title" )
-    #oldvalue="$G_TITLE"
-    #newvalue=$( echo "$oldvalue" | sed  -e "s/ ([0-9]*)$//" -e  "s/$/ ($count)/" )
-    #    echo "updating title to $newvalue"
     F[ $TSV_COMMENT_COUNT_COLUMN1 ]="($count)"
     update_row
 #    echo "updated title to $newvalue"
 }
+
+## user input for adding a fix/resolution
 add_fix(){
     item=$1
     reply="fix"
@@ -868,16 +852,9 @@ append_extra_data(){
     let modified+=1
 }
 
-## returns title column, all rows - unused ?
-tsv_titles(){
-        cut -f$TSV_TITLE_COLUMN1 "$TSV_FILE" 
-}
 ## print titles of CSV file
 tsv_headers(){
-    #sed '1q' "$TSV_FILE"
-    #echo "id	status	severity	type	assigned_to	date_created	due_date	title"
     echo "id	status	severity	type	assigned_to	date_created	due_date	CC	modified	title"
-    #cat "$TSV_TITLES_FILE"
 }
 ## gives formatted header for printing
 formatted_tsv_headers(){
@@ -921,69 +898,7 @@ get_next_id(){
     echo "$nextid" > $idfile
     echo $uniqueid
 }
-## Some tsv generic functions
-# takes fieldname, => index of column, starting 1 (for cut etc)
-# # TODO obsolete remove
-tsv_column_index(){
-    [ $# -ne 1 ] && { echo "===== tsv_column_index ERROR one param required"; }
-    # put in hash or function to make faster
-    case $1 in
-        "status" ) echo $TSV_STATUS_COLUMN1; return 0;;
-        "title" ) echo $TSV_TITLE_COLUMN1; return 0;;
-    esac
 
-    [ -z "$titles_arr" ] &&  titles_arr=( $( tsv_headers | tr '\t' ' ' ) )
-
-    #echo `get_word_position "$1" "$titles"`
-    index=$(indexOf $1  "${titles_arr[@]}" )
-    index=$(( index+1 ))
-    echo $index
-}
-# returns index in list, starting 0
-indexOf() {
-   local pattern=$1
-   local index list
-   shift
-
-   list=("$@")
-   for index in "${!list[@]}"
-   do
-       [[ ${list[index]} = $pattern ]] && {
-           echo $index
-           return 0
-       }
-   done
-
-   echo -1
-   return 1
-}
-
-# given a string space delimited, returns which position that word is.
-# starts with 1, in "aa bb cc dd" aa is 1, bb is 2, cc 3
-# typically to use with cut which has base 1
-# # TODO obsolete remove or put in utilities
-get_word_position(){
-    word="$1"
-    string="$2"
-    let ctr=1
-#    echo "word:$word. string:$string."
-    for w in $string
-    do
-#        echo "comp ($w) ($word) ($ctr)"
-        [ "$w" == "$word" ] && { echo $ctr; return; }
-        let ctr+=1
-    done
-    echo -1;
-}
-## returns row for an item
-# please validate item at top of program.
-tsv_get_rowdata(){
-    item="$1"
-    paditem=$( printf "%4s" $item )
-    rowdata=$( grep "^$paditem" "$TSV_FILE" )
-    [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; exit 1;}
-    echo "$rowdata"
-}
 ## Do not call with $() or ``. This does not return values
 ## 
 tsv_get_rowdata_with_lineno(){
@@ -1011,25 +926,6 @@ tsv_get_column_value(){
         index=$colindex
     [ -z "$index" -o "$index" -lt 0 ] && { echo "ERROR FIELDNAME $2"; return;}
     echo "$rowdata" | cut -d $'\t' -f$index
-}
-tsv_get_index_value(){
-    item="$1"
-    index="$2"
-    #echo "item:$item,field:$field"
-    paditem=$( printf "%4s" $item )
-    rowdata=$( grep "^$paditem" "$TSV_FILE" )
-    [ -z "$rowdata" ] && { echo "ERROR itemno $1"; return;}
-    #echo "rowdata:$rowdata"
-    echo "$rowdata" | cut -d $'\t' -f $index
-}
-## given an item, returns linenumber
-## remove after deleting call from del. REDUNDANT TODO
-tsv_lineno(){
-    item="$1"
-    paditem=$( printf "%4s" $item )
-    lineno=$( grep -n "^$paditem" "$TSV_FILE" | cut -d':' -f1  )
-    [ -z "$lineno" ] && { echo -1; return;}
-    echo $lineno
 }
 ## deletes row from tsv file ONLY
 ## Does not delete other files since update uses this.
@@ -1061,41 +957,6 @@ tsv_delete_other_files(){
     grep "^$KEY" "$TSV_COMMENTS_FILE" >> deleted.comments.txt
     sed -i.bak "/^$KEY/d" "$TSV_COMMENTS_FILE"
     return $?
-}
-## updates tsv row with data for given
-## item, columnname, value
-## -1 on errors
-## @obsolete remove after a couple versions TODO
-tsv_set_column_value(){
-    item=$1
-    columnname=$2
-    newvalue="$3"
-    row=$( tsv_get_rowdata $item )
-    #echo "row:$row, lineno: $lineno"
-    [ -z "$row" ] && { echo "row blank!"; return; }
-    position=`tsv_column_index "$columnname"`
-    #echo "position:$position"
-    newrow=$( echo "$row" | tr '\t' '\n' | sed $position"s/.*/$newvalue/" | tr '\n' '\t' )
-    res=$?
-    if [ $res -ne 0 ];
-    then
-        echo "Some error in conversion, can't proceed with operation"
-        return $res
-    fi
-    [ -z "$newrow" ] && { echo "conversion resulted in a blank, can't go on. Program error!"; return 99;}
-    newrow=$( echo "$newrow" | sed "s/$DELIM$//" )
-    # could use $o
-    #var=$(echo ${var%\t})
-    #echo "newrow:$newrow"
-    #echo "lineno:$lineno"
-    [ -z "$lineno" ] && die "Lineno number, cannot update record. Pls check why."
-## CAUTION: if lineno is blank, will update / overwrite the last row !!
-ex - "$TSV_FILE"<<!
-${lineno}c
-$newrow
-.
-x
-!
 }
 
 ## fix for convert old code to new
@@ -1311,6 +1172,7 @@ update_extra_data(){
 }
 
 ## colors data passed in based on priority
+##+ might get obsoleted soon
 color_by_priority(){
     data=$(
          sed '''
@@ -1835,7 +1697,6 @@ case $action in
     i_severity=${DEFAULT_SEVERITY:-"normal"}
     i_status=${DEFAULT_STATUS:-"open"}
     [ "$PROMPT_DEFAULT_TYPE" == "yes" ] && {
-        #i_type=`get_code "type" "$DEFAULT_TYPE"`
         get_code "type" "$DEFAULT_TYPE"
         i_type=$RESULT
     }
@@ -2218,7 +2079,6 @@ note: PRIORITY must be anywhere from A to Z."
 
 
         # tsv stuff
-        #oldvalue=$( tsv_get_column_value $item "title" )
         oldvalue="$G_TITLE"
         newvalue=$( echo "$oldvalue" | sed  -e "s/^([A-Z]) //" -e  "s/^/($newpri) /" )
                    F[ $TSV_TITLE_COLUMN1 ]="$newvalue"
@@ -2231,7 +2091,6 @@ note: PRIORITY must be anywhere from A to Z."
         errmsg="usage: $TSV_PROGNAME $action ITEM#"
         common_validation $1 $errmsg 
         # tsv stuff
-        #oldvalue=$( tsv_get_column_value $item "title" )
         oldvalue="$G_TITLE"
         newvalue=$( echo "$oldvalue" | sed  -e "s/^(.) //" )
                    F[ $TSV_TITLE_COLUMN1 ]="$newvalue"
