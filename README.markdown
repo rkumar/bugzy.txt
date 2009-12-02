@@ -4,14 +4,11 @@ BUGZY.TXT Command Line Bug Tracker
 A simple, extensible shell script (bash) for managing
 bugs/features/enhancements and tasks.
 
-Maintains title, description, create_date, due_date, severity, type,
+Maintains summary, description, create_date, scheduled start date, due_date, severity, type,
 priority, assigned to, multiple comments, fix/resolution, various statuses.
 
 All modifications are logged.
 Mails are sent using the 'mail' command if specified.
-
-I am making structure changes. Hold on a day or so.
-I am releasing 0.2.0 in a day or so, after more testing. 
 
 Downloads
 ---------
@@ -55,11 +52,12 @@ with
 ### Usage
 
 Current operations include **add**, **mod**, **delete**, **list**, list by severity,
-show / print, tag, **quick**/q (listing), grep, **qadd** (quick add).
+show / print, tag, **quick**/q (listing), grep, **qadd** (quick add) and
+various listings.
 
 When adding an issue, entry of fields can be reduced by adding a default
 in the config file, and setting PROMPT to NO. When entering due_date, a
-value such as "+3 days" or "tomorrow" may be entered (provided your
+value such as "+3" or "tomorrow" may be entered (provided your
 version of `date` can do the conversion.
 
 You can add an issue with only a title using  `qadd`. Defaults will be
@@ -70,12 +68,6 @@ option for examples).
 
 Actions to directly change status are open, started, closed, canceled,
 stopped or the first 3 letter of each.
-
-"selectm" or "selm" is a multiple criteria search as:
-
-    bugzy selectm "type: bug" "status: open" ...  
-
-    bugzy selectm "type=bug" "status=(open|started)" "severity=critical"  
 
 
 "pri" adds a priority to as task or bug, which results in a change in color, and having it 
@@ -117,16 +109,19 @@ You may also alias bugzy to "b" in ~/.bashrc or equivalent.
      b add "Module aaa crashes on startup"  
      b show
      b list  
-     b mod 1  
+     b mod 1 # user can select fields to modify 
      b start 1  
-     b close --comment:"some optional comment comes here" 1  
+     b close --comment="some optional comment comes here" 1  
+     b clo   --fix="resolved by ...." 1
      b show  
-     b add "Module bbb crashes on startup"  
+     b add "Module bbb crashes on startup" # user prompted for other fields 
      b pri 2 A  
      b  
 
      b depri 2  
      b q
+     b q -CLO -CAN
+     b q "(OPE|STA)"
      b status
      b grep crash
      b tag URG 1 2
@@ -135,6 +130,9 @@ You may also alias bugzy to "b" in ~/.bashrc or equivalent.
      b newest 5
      b recentlog
      b recentcomment
+     b chpri 1 2 P2
+     b chstart 1 2 +5
+     b chstart 1 2 2009-12-25
 
      b -h     # short help
      b help   # longer help
@@ -148,7 +146,7 @@ Screenshots
 Others
 ------
 
-- Uses the excellent [todo.txt shell script](http://github.com/ginatrapani/todo.txt-cli) as a base.
+- Used the excellent [todo.txt shell script](http://github.com/ginatrapani/todo.txt-cli) as a base.
 
 - Original *anaemic* release by rkumar on 2009-11-08.
 
