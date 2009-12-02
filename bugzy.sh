@@ -494,8 +494,9 @@ _list()
     else
         filtered_items=$items
     fi
-    pretty_print_headers | cut -d '|' -f$opt_fields
     opt_fields=${opt_fields:-"1-7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
+    #pretty_print_headers | cut -d '|' -f$opt_fields
+    pretty_print_headers | cut -d '|' -f$opt_fields | sed 's/-|-/-+-/g'
     opt_sort=${opt_sort:-"1,1"}
 
     #the next line was resulting in newline creating trouble
@@ -880,6 +881,7 @@ tsv_headers(){
 }
 ## gives formatted header for printing
 formatted_tsv_headers(){
+    echo "-----|-----|-----|-----|------------|------------|------------|-----|-----|-------------------"
     echo "  Id |Statu|Sever|Type |Assigned To | Start Date |  Due Date  | CC  | Pri |     Title  "
     echo "-----|-----|-----|-----|------------|------------|------------|-----|-----|-------------------"
 }
@@ -889,8 +891,9 @@ formatted_tsv_headers(){
 ##+ delim on both lines. Don't change delim.
 ## @see pretty_print
 pretty_print_headers(){
+    echo "-----|---|-----|---|------------|------------|------------|-----|----|------------------------------------------"
     echo "  Id |Sta| Sev |Bug|Assigned To | Start Date |  Due Date  | CC  |Pri |     Title  "
-    echo "-----|---|-----|---|------------|------------|------------|-----|----|--------------------------------"
+    echo "-----|---|-----|---|------------|------------|------------|-----|----|------------------------------------------"
 }
 ## color the given data
 ## please set USE_PRI before calling else it will use $PRI_A
@@ -1327,8 +1330,9 @@ show_source(){
 }
 ## short header for reports with on Id and title
 short_title(){
-    echo "  Id |Sta| B | Cc  |     Title                                   "
-    echo "-----+---+---+-----+---------------------------------------------"
+    echo "-----+---+---+-----+----+-----------------------------------------------"
+    echo "  Id |Sta| B | Cc  |Pri |     Title                                   "
+    echo "-----+---+---+-----+----+-----------------------------------------------"
 }
 
 ## first use gnu date format to  calc
@@ -2088,7 +2092,7 @@ opt_fields=${opt_fields:-"1,2,4,$TSV_START_DATE_COLUMN1,$TSV_DUE_DATE_COLUMN1,$T
     count=$(echo $valid | grep -c $status)
     [ $count -eq 1 ] || die "$errmsg"
     #formatted_tsv_headers 
-    pretty_print_headers | cut -d '|' -f$opt_fields 
+    pretty_print_headers | cut -d '|' -f$opt_fields | sed 's/-|-/-+-/g'
     grep  $FLAG "^....${DELIM}$status${DELIM}" "$TSV_FILE" \
         | cut -d $'\t' -f$opt_fields \
         | eval ${TSV_SORT_COMMAND}           \
@@ -2140,7 +2144,8 @@ opt_fields=${opt_fields:-"1,2,4,$TSV_START_DATE_COLUMN1,$TSV_DUE_DATE_COLUMN1,$T
     [ $full_regex -gt 0 ] && regex+="${assigned_to}${DELIM}${date_created}${DELIM}${due_date}${DELIM}${title}"
     [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "regex:($regex)"
     opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
-    pretty_print_headers | cut -d '|' -f$opt_fields
+    #pretty_print_headers | cut -d '|' -f$opt_fields
+    pretty_print_headers | cut -d '|' -f$opt_fields | sed 's/-|-/-+-/g'
     # -P is GNU only, wont work everywhere, UGH
     #grep -P "$regex" "$TSV_FILE"
     grep "$regex" "$TSV_FILE" \
@@ -2359,7 +2364,7 @@ note: PRIORITY must be anywhere from A to Z."
             # put symbold in global vars so consistent TODO, color this based on priority
             # now that we've removed id from title, i've had to do some jugglery to switch cols
 "quick" | "q" ) # COMMAND: list. a quick report showing status and title sorted on status
-        opt_fields=${opt_fields:-"1,2,4,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
+        opt_fields=${opt_fields:-"1,2,4,$TSV_COMMENT_COUNT_COLUMN1,$TSV_PRIORITY_COLUMN1,$TSV_TITLE_COLUMN1"}
         opt_postsort=${opt_postsort:-"2,2 -k5,5"}
         short_title
         generic_report "$@"
@@ -2377,6 +2382,7 @@ note: PRIORITY must be anywhere from A to Z."
             regex="$@"
             [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: grep : $@"
     #        short_title
+            echo "------+---+----+-------------------------------------------------"
             echo "  Id  | B |Pri |      Title                                   "
             echo "------+---+----+-------------------------------------------------"
     filter_data "$@" \
@@ -2387,6 +2393,7 @@ note: PRIORITY must be anywhere from A to Z."
     | sort -k1,1 \
     | pretty_print
 #        show_source
+            echo "------+---+----+-------------------------------------------------"
    legend
             ;;
 
