@@ -1606,6 +1606,29 @@ filter_data(){
         #filtered_items=$items
     fi
 }
+
+## expects start_date to be set.
+## converts if required and stores
+update_start_date(){
+
+            [[ ${start_date:0:1} == "+" ]] && conversion_done=1;
+            [ ! -z "$start_date" ] && { start_date=`convert_due_date "$start_date"`
+            if [[ $conversion_done == 1 ]];
+            then
+                echo "Start date converted to $start_date"
+            fi
+            oldvalue="${F[ $TSV_START_DATE_COLUMN1 ]}"
+            text="$start_date"
+            F[ $TSV_START_DATE_COLUMN1 ]="$text"
+            update_row 
+
+            reply="start_date"
+            log_changes1 $reply "#$item start date changed from ${oldvalue} to ${text}"
+            [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak "/^$reply:/s/^.*$/$reply: $text/" $file
+            #show_diffs 
+            let modified+=1
+        }
+}
 ## ADD FUNCTIONS ABOVE
 out=
 file=
@@ -1829,6 +1852,8 @@ case $action in
     [ "$RESULT" == "yes" ] && {
         get_input "emailid" "$EMAIL_TO"
 
+        ## TODO does this actually take updated email. i've nevr tried changnig.
+
         [ ! -z "$EMAIL_TO" ] && { 
             #body=`PRI_A=$NONE;DEFAULT=$NONE;print_item $item`
             body=`print_item $item`
@@ -1960,21 +1985,7 @@ case $action in
             ;;
             "start_date" )
             read start_date
-            [[ ${start_date:0:1} == "+" ]] && conversion_done=1;
-            [ ! -z "$start_date" ] && { start_date=`convert_due_date "$start_date"`
-            if [[ $conversion_done == 1 ]];
-            then
-                echo "Start date converted to $start_date"
-            fi
-            text="$start_date"
-                   F[ $TSV_START_DATE_COLUMN1 ]="$text"
-                   update_row 
-
-                   log_changes1 $reply "#$item $reply changed from ${oldvalue} to ${text}"
-                   [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak "/^$reply:/s/^.*$/$reply: $text/" $file
-                   #show_diffs 
-                   let modified+=1
-                }
+            update_start_date
             ;;
             "description" | "fix" )
                 description=$( get_extra_data $item $reply )
@@ -2557,7 +2568,44 @@ note: PRIORITY must be anywhere from A to Z."
     fi
     ;;
 
-    ## TODO: add start_date action here
+## change scheduled start date of item
+"chstart" ) # COMMAND: change sch start date
+    errmsg="usage: $TSV_PROGNAME $action ITEM# start_date.\ndate may be YYYY-MM-DD or +n"
+
+    [ "$#" -lt 2 ] && die "(argc) $errmsg"
+    start_date="${@: -1}"
+    #others="${@:1:${#}-1}"
+    echo "last is $start_date"
+    numargs=$#
+    for ((i=1 ; i < numargs ; i++)); do
+        common_validation "$1" "$errmsg"
+        update_start_date
+        shift
+    done
+
+    cleanup
+    ;;
+"chpri" )
+    errmsg="usage: $TSV_PROGNAME $action ITEM# P1..5. "
+
+    [ "$#" -lt 2 ] && die "(argc) $errmsg"
+    newpri="${@: -1}"
+    newpri=$( echo "$newpri" | tr 'p' 'P' )
+    [[ "$newpri" = P[1-5] ]] || die "(P1..5) $errmsg"
+
+    numargs=$#
+    for ((i=1 ; i < numargs ; i++)); do
+        common_validation "$1" "$errmsg"
+        oldvalue="${F[ $TSV_PRIORITY_COLUMN1 ]}"
+        [ "$oldvalue" == "$newpri" ] && { echo "skipping $item ...";  continue;}
+        F[ $TSV_PRIORITY_COLUMN1 ]="$newpri"
+        update_row
+        log_changes1 "priority" "#$item priority set to $newpri (earlier $oldvalue)"
+        shift
+    done
+    cleanup
+    ;;
+
 "help" )
     help
     ;;
