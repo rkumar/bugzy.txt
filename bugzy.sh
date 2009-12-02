@@ -6,11 +6,12 @@
 # 2009-11-29 v0.1.14 - added modified timestamp and comment count in tsv file
 # 2009-11-30 v0.1.16 - moved description and fix into tsv 
 # 2009-12-01 v0.1.16 - separated log and comments
+# 2009-12-02 v0.1.17 - replace date_created with start_date, and put create at end
 # rkumar                                                
 # 
 # 
 # TODO - how to view archived data
-# TODO - should be able to search text in desc, fix and comments
+## TODO - should be able to search text in desc, fix and comments
 # CAUTION: we are putting priority at start of title, and tags at end.
 #
 
@@ -34,7 +35,7 @@ TSV_ARCHIVE_FILE="archived.txt"
 #TSV_TITLES_FILE="titles.tsv"
 # what fields are we to prompt for in mod
 TSV_EDITFIELDS="title description status severity type assigned_to due_date comment fix"
-TSV_PRINTFIELDS="title id status severity type assigned_to date_created due_date"
+TSV_PRINTFIELDS="title id status severity type assigned_to date_created start_date due_date priority"
 TSV_PRETTY_PRINT=1
 # should desc and comments be printed in "list" command
 TSV_PRINT_DETAILS=0
@@ -50,13 +51,15 @@ TSV_STATUS_COLUMN1=2
 TSV_SEVERITY_COLUMN1=3
 TSV_TYPE_COLUMN1=4
 TSV_ASSIGNED_TO_COLUMN1=5
-TSV_DATE_CREATED_COLUMN1=6
+TSV_START_DATE_COLUMN1=6
 TSV_DUE_DATE_COLUMN1=7
 TSV_COMMENT_COUNT_COLUMN1=8
-TSV_MODIFIED_COLUMN1=9
+TSV_PRIORITY_COLUMN1=9
 TSV_TITLE_COLUMN1=10
 TSV_DESCRIPTION_COLUMN1=11
 TSV_FIX_COLUMN1=12
+TSV_DATE_CREATED_COLUMN1=13
+TSV_MODIFIED_COLUMN1=14
 
 TSV_CREATE_FLAT_FILE=0
 TSV_WRITE_FLAT_FILE=0
@@ -1010,10 +1013,10 @@ tsv_delete_item(){
     [ ! -d "$DELETED_DIR" ] && mkdir "$DELETED_DIR";
     echo "$row" >> "$TSV_FILE_DELETED"
     sed -i.bak "${lineno}d" "$TSV_FILE"
-    [ $? -eq 0 ] && echo "Deleted $item."
+    [ $? -eq 0 -a "$TSV_VERBOSE_FLAG" -gt 1 ] && echo "Deleted $item."
     #moved back here on 2009-11-19 12:34 since update does not delete and should not
     tsv_delete_other_files $item
-    [ $? -eq 0 ] && echo "Deleted other files for $item."
+    [ $? -eq 0 -a "$TSV_VERBOSE_FLAG" -gt 1 ] && echo "Deleted other files for $item."
 }
     
 tsv_delete_other_files(){
@@ -1345,6 +1348,7 @@ create_tsv_file()
     KEY=$( printf "%4s" "$serialid" )
     paditem="$KEY"
     tabcommentcount="   "
+    tabpri="P3"
     tabtimestamp=$(date +%s)
     TSV_NOW=`date "$TSV_DATE_FORMAT"`
       [  -z "$i_desc" ] && { i_desc=""; }
@@ -1352,7 +1356,8 @@ create_tsv_file()
       [  -z "$i_fix" ] && { i_fix=""; }
       i_fix=$( echo "$i_fix" | tr '\n' '' )  # for future in case
       # putting desc and fix into main data.tsv
-    tabfields="$KEY${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$TSV_NOW${del}$i_due_date${del}$tabcommentcount$del$tabtimestamp$del$atitle$del$i_desc$del$i_fix"
+      # added start_date, put crea and mod at end, added pri at 9
+    tabfields="$KEY${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$TSV_NOW_SHORT${del}$i_due_date${del}$tabcommentcount$del$tabpri$del$atitle$del$i_desc$del$i_fix$tabtimestamp$del$tabtimestamp"
     echo "$tabfields" >> "$TSV_FILE"
     [ -d "$ISSUES_DIR" ] || mkdir "$ISSUES_DIR"
       #[ ! -z "$i_desc" ] && {
@@ -1855,6 +1860,8 @@ case $action in
 
 
 "modify" | "mod") # COMMAND: modify fields of an item
+## TODO : add pri
+## TODO : add start_date
     errmsg="usage: $TSV_PROGNAME $action task#"
     modified=0
     item=$1
@@ -2132,6 +2139,8 @@ opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"
 
 "pri" ) # COMMAND: give priority to a task, appears in title and colored and sorted in some reports
 
+## TODO: reconcile A-Z with P1 to P5
+
     errmsg="usage: $TSV_PROGNAME $action ITEM# PRIORITY
 note: PRIORITY must be anywhere from A to Z."
 
@@ -2177,62 +2186,9 @@ note: PRIORITY must be anywhere from A to Z."
             item=$( sed '$!d' "$TSV_FILE" | cut -f1 | sed 's/ *//g' )
             echo "No item passed. Showing last one ($item)"
         }
-        common_validation $item $errmsg
-
-        # read up the headers into an array
-        declare -a headers
-        let ctr=0
-        titles=$( tsv_headers | tr '\t' ' ' )
-        for LINE in $titles
-        do
-            headers[$ctr]=$LINE
-            let ctr+=1
-        done
-        #paditem=$( printf "%4s" $item )
-        #rowdata=$( grep "^$paditem" "$TSV_FILE" | tr '\t' '\n' )
-        #echo "$rowdata" | while read field
-
-        # put fields into hash so we can change the order
-        OLDIFS=$IFS
-        let ctr=0
-        IFS=$'\t'
-        for field in $( echo -e "$rowdata"  )
-        do
-            #echo "${headers[$ctr]}: $field"
-            hash_set "rowdata" "${headers[$ctr]}" "$field"
-            let ctr+=1
-        done
-        IFS=$OLDIFS
-        ## we need to print iit in the following order
-        xfields="title id status severity type assigned_to date_created due_date"
-        for xfile in $xfields
-        do
-            xxfile=$( printf "%-13s" "$xfile" )
-            row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
-            echo -en "$row"
-            hash_echo "rowdata" "$xfile"
-            [ "$xfile" == "due_date" ] && { calc_overdue $( hash_echo "rowdata" "$xfile" ); }
-        done
-        echo
-        # read up the files containing multiline data
-        xfields="description fix comment log"
-        [ ! -z "$opt_no_log" ] && { xfields="${xfields/log/}"; }
-        for xfile in $xfields
-        do
-            description=$( get_extra_data $item $xfile )
-            [ ! -z "$description" ] && { 
-            [ "$xfile" == "log" ] && xfile="change log";
-            xxfile=$( printf "%-13s" "$xfile" )
-            row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
-            echo -e "$row"
-            #echo "$description"
-            # moved to comment lines written as one line with control A in place of newline
-            #echo "$description" | tr '' '\n' | sed 's/^/  /g;2,$s/^/                    /g'
-            # C-a processing
-            echo "$description" | sed 's/^/  /g;'
-            echo
-        }
-        done
+        #common_validation $item $errmsg
+        data=$( print_item "$1" | sed 's/^\([[a-zA-Z_ ]*\):/'$YELLOW'\1:'$DEFAULT'/g' )
+        echo -e "$data"
 
         ;;
 "viewlog" | "viewcomment" ) # COMMAND: view comments for an item
@@ -2526,7 +2482,6 @@ note: PRIORITY must be anywhere from A to Z."
     tail -25 "$TSV_LOG_FILE" | cut -d $'\t' -f1,3- | sed 's/~/ | /'
     ;;
 "recentcomment" | "rc" ) # COMMAND: list recent comments 
-    # TODO, we should show the title too , somehow
     # silly sed does not respect tab or newline, gsed does. So I went through some hoops to indent comment
     #grep ':com:' "$TSV_EXTRA_DATA_FILE"| tail | cut -d : -f1,3- | sed 's/:/ | /1;s/~/ | /' | sed "s//   /g;" | tr '' '\n'
     #tail -25 "$TSV_COMMENTS_FILE" | sed "s//   /g;" | tr '' '\n'
@@ -2578,6 +2533,7 @@ note: PRIORITY must be anywhere from A to Z."
     fi
     ;;
 
+    ## TODO: add start_date action here
 "help" )
     help
     ;;
