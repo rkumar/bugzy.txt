@@ -689,7 +689,6 @@ change_status()
         # tsv stuff
         F[ $TSV_STATUS_COLUMN1]=$newcode
         update_row
-        #tsv_set_column_value $item $reply $newcode
         echo "$item is now $newcode ($input)"
         #log_changes $reply "$oldvalue" $newcode $file
         log_changes1 $reply "#$item $input"
@@ -726,7 +725,6 @@ common_validation()
     #[ ! -r "$file" ] && die "No such file: $file"
 
     # tsv stuff
-#    lineno=`tsv_lineno $item`
  ## sets rowdata and lineno
     tsv_get_rowdata_with_lineno "$KEY"
 
@@ -806,7 +804,6 @@ add_comment_count_to_title(){
     #oldvalue="$G_TITLE"
     #newvalue=$( echo "$oldvalue" | sed  -e "s/ ([0-9]*)$//" -e  "s/$/ ($count)/" )
     #    echo "updating title to $newvalue"
-    #tsv_set_column_value $item "title" "$newvalue"
     F[ $TSV_COMMENT_COUNT_COLUMN1 ]="($count)"
     update_row
 #    echo "updated title to $newvalue"
@@ -860,15 +857,19 @@ tsv_headers(){
     echo "id	status	severity	type	assigned_to	date_created	due_date	CC	modified	title"
     #cat "$TSV_TITLES_FILE"
 }
-# gives formatter header for printing
-# see pretty_print
+## gives formatted header for printing
 formatted_tsv_headers(){
-    echo "  Id |Statu|Sever|Type |Assigned To |Date Created|  Due Date  | CC  | Modified |     Title  "
-    echo "-----|-----|-----|-----|------------|------------|------------|-----|----------|-------------------"
+    echo "  Id |Statu|Sever|Type |Assigned To | Start Date |  Due Date  | CC  | Pri |     Title  "
+    echo "-----|-----|-----|-----|------------|------------|------------|-----|-----|-------------------"
 }
+## headers to print
+## these should be in the same order as data in TSV
+## Caller cuts the fields from here based on which fields are being displayed, using the pipe
+##+ delim on both lines. Don't change delim.
+## @see pretty_print
 pretty_print_headers(){
-    echo "  Id |Sta| Sev |Bug|Assigned To |Date Created|  Due Date  | CC  | Modified |     Title  "
-    echo "-----|---|-----|---|------------|------------|------------|-----|----------|--------------------------------"
+    echo "  Id |Sta| Sev |Bug|Assigned To | Start Date |  Due Date  | CC  |Pri |     Title  "
+    echo "-----|---|-----|---|------------|------------|------------|-----|----|--------------------------------"
 }
 ## color the given data
 ## please set USE_PRI before calling else it will use $PRI_A
@@ -898,6 +899,7 @@ get_next_id(){
 }
 ## Some tsv generic functions
 # takes fieldname, => index of column, starting 1 (for cut etc)
+# # TODO obsolete remove
 tsv_column_index(){
     [ $# -ne 1 ] && { echo "===== tsv_column_index ERROR one param required"; }
     # put in hash or function to make faster
@@ -935,6 +937,7 @@ indexOf() {
 # given a string space delimited, returns which position that word is.
 # starts with 1, in "aa bb cc dd" aa is 1, bb is 2, cc 3
 # typically to use with cut which has base 1
+# # TODO obsolete remove or put in utilities
 get_word_position(){
     word="$1"
     string="$2"
@@ -980,7 +983,6 @@ tsv_get_column_value(){
     paditem=$( printf "%4s" $item )
     rowdata=$( grep "^$paditem" "$TSV_FILE" )
     [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; return;}
-    #index=`tsv_column_index "$field"`
         get_column_index "$field"
         index=$colindex
     [ -z "$index" -o "$index" -lt 0 ] && { echo "ERROR FIELDNAME $2"; return;}
@@ -1039,7 +1041,7 @@ tsv_delete_other_files(){
 ## updates tsv row with data for given
 ## item, columnname, value
 ## -1 on errors
-## @obsolete remove after a couple versions
+## @obsolete remove after a couple versions TODO
 tsv_set_column_value(){
     item=$1
     columnname=$2
@@ -1111,7 +1113,6 @@ print_item(){
     output=""
     for field in $( echo $TSV_PRINTFIELDS )
     do
-        #index=`tsv_column_index "$field"`
         get_column_index "$field"
         index=$colindex
         value="${F[$index]}"
@@ -1174,12 +1175,8 @@ calc_overdue()
 # removed the pesky id in titles, to colorize titles i am colorizing data after last tab
 # \+ does not work in my sed, but works in gsed
 pretty_print(){
-    #tomorrow=`date --date="tomorrow" '+%Y-%m-%d'`
-            #-e  "/^....${DELIM}CLO${DELIM}/s/^ /x /g" \
-            #-e  "/^....${DELIM}CAN${DELIM}/s/^ /x /g" \
-            #-e  "/^....${DELIM}OPE${DELIM}/s/^ /_ /g" \
-            #-e  "/^....${DELIM}STA${DELIM}/s/^ /@ /g" \
     tomorrow=$( date_calc +1 )
+    today="$TSV_NOW_SHORT"
 
     #dayafter=`date --date="+2 days" '+%Y-%m-%d'`
     dayafter=$( date_calc +2 )
@@ -1188,6 +1185,9 @@ pretty_print(){
         local data=$( sed -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
             -e  "s/${DELIM}CRI${DELIM}/${DELIM}${PRI_A}CRI${DEFAULT}${DELIM}/g" \
             -e  "s/${DELIM}MOD${DELIM}/${DELIM}${PRI_B}MOD${DEFAULT}${DELIM}/g" \
+            -e  "/${DELIM}P1${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_A}\2${DEFAULT}/g" \
+            -e  "/${DELIM}P2${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_B}\2${DEFAULT}/g" \
+            -e  "s/${DELIM}\(P[12]\)${DELIM}/${DELIM}${PRI_A}\1${DEFAULT}${DELIM}/g" \
         -e "s/${DELIM} $//" \
         -e "s/${DELIM}\(([0-9]\{1,\})\)$/ \1/" \
             -e  "/^....${DELIM}CLO${DELIM}/s/CLO/x/" \
@@ -1201,8 +1201,10 @@ pretty_print(){
             -e  "/${DELIM}ENH${DELIM}/s/ENH/ /" \
             -e  "/${DELIM}${tomorrow}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_A}\2${DEFAULT}/g" \
             -e  "/${DELIM}${dayafter}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_B}\2${DEFAULT}/g" \
+            -e  "/${DELIM}${today}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_C}\2${DEFAULT}/g" \
             -e  "s/${tomorrow}/${PRI_A}${tomorrow}${DEFAULT}/g" \
             -e  "s/${dayafter}/${PRI_B}${dayafter}${DEFAULT}/g" \
+            -e  "s/${today}/${PRI_C}${today}${DEFAULT}/g" \
             -e "s/$DELIM/$TSV_OUTPUT_DELIMITER/g" 
             )
             echo -e "$data"
@@ -1903,7 +1905,6 @@ case $action in
         newcode=`convert_long_to_short_code $input` # not required now since its new code
         echo "selected $longcode ($newcode)"
         TSV_NOW=`date "$TSV_DATE_FORMAT"`
-        #tsv_set_column_value $item $reply $newcode
         [ "$oldvalue" == "$newcode" ] && { die "$item is already $oldvalue ($longcode)"; }
         set_update_row $reply $newcode
         #log_changes $reply $oldvalue $newcode $file
@@ -1920,7 +1921,6 @@ case $action in
                 edit_tmpfile
                 [ $RESULT -gt 0 ] && {
                    text=$(cat $TMP_FILE)
-                   #tsv_set_column_value $item $reply "$text"
                    F[ $TSV_TITLE_COLUMN1 ]="$text"
                    update_row
                    #log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
@@ -1948,7 +1948,6 @@ case $action in
                 echo "Due date converted to $due_date"
             fi
             text="$due_date"
-                   #tsv_set_column_value $item "due_date" "$text"
                    F[ $TSV_DUE_DATE_COLUMN1 ]="$text"
                    update_row 
 
@@ -2030,7 +2029,7 @@ done # while true
 "list" | "ls") # COMMAND: list use -l for details
 ## sub-option: --sort, --fields
 ## b list --fields="1,2,7,8" --sort="2,2 -k8,8"
-opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
+opt_fields=${opt_fields:-"1,2,4,$TSV_START_DATE_COLUMN1,$TSV_DUE_DATE_COLUMN1,$TSV_PRIORITY_COLUMN1,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
        _list "$@"
        cleanup;;
 
@@ -2105,7 +2104,6 @@ opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"
     #id  status  severity        type    assigned_to     date_created    due_date        title
     [ $full_regex -gt 0 ] && regex+="${assigned_to}${DELIM}${date_created}${DELIM}${due_date}${DELIM}${title}"
     [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "regex:($regex)"
-    #tsv_headers
     opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
     pretty_print_headers | cut -d '|' -f$opt_fields
     # -P is GNU only, wont work everywhere, UGH
@@ -2182,7 +2180,6 @@ note: PRIORITY must be anywhere from A to Z."
         #oldvalue=$( tsv_get_column_value $item "title" )
         oldvalue="$G_TITLE"
         newvalue=$( echo "$oldvalue" | sed  -e "s/^([A-Z]) //" -e  "s/^/($newpri) /" )
-        #tsv_set_column_value $item "title" "$newvalue"
                    F[ $TSV_TITLE_COLUMN1 ]="$newvalue"
                    update_row
         log_changes1 "priority" "#$item priority set to $newpri ($newvalue)"
@@ -2196,7 +2193,6 @@ note: PRIORITY must be anywhere from A to Z."
         #oldvalue=$( tsv_get_column_value $item "title" )
         oldvalue="$G_TITLE"
         newvalue=$( echo "$oldvalue" | sed  -e "s/^(.) //" )
-        #tsv_set_column_value $item "title" "$newvalue"
                    F[ $TSV_TITLE_COLUMN1 ]="$newvalue"
                    update_row
         log_changes1 "priority" "#$item priority removed ($newvalue)"
