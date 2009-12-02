@@ -518,8 +518,11 @@ _list()
             echo -ne "$row\n"
             rowitem=$( echo -e "$row" | cut -d $'|' -f1 )
             rowitem=${rowitem// /}
+            KEY=$( printf "%4s" $rowitem )
             if [[ "$rowitem" = +([0-9]) ]]; then  
-                get_extra_data $rowitem description | sed '1s/^/      Desc: /;2,$s/^/      >/g;'
+                # TODO OUCH now getextra reads from arraty which is not populated
+                tsv_get_column_value $rowitem "description" | sed '1s/^/      Desc: /;2,$s/^/      >/g;'
+                #get_extra_data $rowitem description | sed '1s/^/      Desc: /;2,$s/^/      >/g;'
                 get_extra_data $rowitem comment     | sed '1s/^/      Comments: /;2,$s/^/      >/g;'
             else
                 echo "rowitem was ($rowitem)"
@@ -1124,6 +1127,7 @@ get_extra_data(){
             return
         ;;
         "comment" )
+        [ -z "$KEY" ] && KEY=$( printf "%4s" $item )
             grep "^$KEY" "$TSV_COMMENTS_FILE"  | cut -d$'\t' -f2- | tr '' '\n'
             return
         ;;
