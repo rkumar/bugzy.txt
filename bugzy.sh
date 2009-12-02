@@ -6,7 +6,7 @@
 # 2009-11-29 v0.1.14 - added modified timestamp and comment count in tsv file
 # 2009-11-30 v0.1.16 - moved description and fix into tsv 
 # 2009-12-01 v0.1.16 - separated log and comments
-# 2009-12-02 v0.1.17 - replace date_created with start_date, and put create at end
+# 2009-12-02 v0.2.00 - replace date_created with start_date, and put create at end
 # rkumar                                                
 # 
 # 

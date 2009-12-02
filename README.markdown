@@ -11,6 +11,7 @@ All modifications are logged.
 Mails are sent using the 'mail' command if specified.
 
 I am making structure changes. Hold on a day or so.
+I am releasing 0.2.0 in a day or so, after more testing. 
 
 Downloads
 ---------
