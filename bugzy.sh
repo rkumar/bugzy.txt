@@ -1342,7 +1342,8 @@ create_tsv_file()
     tabstat=$( echo ${i_status:0:3} | tr "a-z" "A-Z" )
     tabseve=$( echo ${i_severity:0:3} | tr "a-z" "A-Z" )
     tabtype=$( echo ${i_type:0:3} | tr "a-z" "A-Z" )
-    tabid=$( printf "%4s" "$serialid" )
+    KEY=$( printf "%4s" "$serialid" )
+    paditem="$KEY"
     tabcommentcount="   "
     tabtimestamp=$(date +%s)
     TSV_NOW=`date "$TSV_DATE_FORMAT"`
@@ -1351,7 +1352,7 @@ create_tsv_file()
       [  -z "$i_fix" ] && { i_fix=""; }
       i_fix=$( echo "$i_fix" | tr '\n' '' )  # for future in case
       # putting desc and fix into main data.tsv
-    tabfields="$tabid${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$TSV_NOW${del}$i_due_date${del}$tabcommentcount$del$tabtimestamp$del$atitle$del$i_desc$del$i_fix"
+    tabfields="$KEY${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$TSV_NOW${del}$i_due_date${del}$tabcommentcount$del$tabtimestamp$del$atitle$del$i_desc$del$i_fix"
     echo "$tabfields" >> "$TSV_FILE"
     [ -d "$ISSUES_DIR" ] || mkdir "$ISSUES_DIR"
       #[ ! -z "$i_desc" ] && {
