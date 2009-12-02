@@ -12,6 +12,7 @@
 # 
 # TODO - how to view archived data
 ## TODO - should be able to search text in desc, fix and comments
+## TODO - too many mails, can we configure how many or what events.
 # CAUTION: we are putting priority at start of title, and tags at end.
 #
 
@@ -19,13 +20,14 @@
 TMP_FILE=${TMPDIR:-/tmp}/prog.$$
 trap "rm -f $TMP_FILE.?; exit 1" 0 1 2 3 13 15
 TSV_PROGNAME=$(basename "$0")
+TSV_PROGNAME_FULL_SH="$0"
 TODO_SH=$TSV_PROGNAME
 #TODO_DIR="/Users/rahul/work/projects/rbcurse"
 export TSV_PROGNAME
-Date="2009-11-16"
+Date="2009-12-02"
 TSV_DATE_FORMAT='+%Y-%m-%d %H:%M'
 TSV_DUE_DATE_FORMAT='+%Y-%m-%d'
-arg0=$(basename "$0")
+arg0=$TSV_PROGNAME
 
 TSV_FILE="data.tsv"
 TSV_EXTRA_DATA_FILE="ext.txt"
@@ -34,7 +36,7 @@ TSV_LOG_FILE="blog.tsv"
 TSV_ARCHIVE_FILE="archived.txt"
 #TSV_TITLES_FILE="titles.tsv"
 # what fields are we to prompt for in mod
-TSV_EDITFIELDS="title description status severity type assigned_to due_date comment fix"
+TSV_EDITFIELDS="title description status severity type assigned_to start_date due_date priority comment fix"
 TSV_PRINTFIELDS="title id status severity type assigned_to date_created start_date due_date priority"
 TSV_PRETTY_PRINT=1
 # should desc and comments be printed in "list" command
@@ -1357,7 +1359,7 @@ create_tsv_file()
       i_fix=$( echo "$i_fix" | tr '\n' '' )  # for future in case
       # putting desc and fix into main data.tsv
       # added start_date, put crea and mod at end, added pri at 9
-    tabfields="$KEY${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$TSV_NOW_SHORT${del}$i_due_date${del}$tabcommentcount$del$tabpri$del$atitle$del$i_desc$del$i_fix$tabtimestamp$del$tabtimestamp"
+    tabfields="$KEY${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$TSV_NOW_SHORT${del}$i_due_date${del}$tabcommentcount$del$tabpri$del$atitle$del$i_desc$del$i_fix$del$TSV_NOW$del$tabtimestamp"
     echo "$tabfields" >> "$TSV_FILE"
     [ -d "$ISSUES_DIR" ] || mkdir "$ISSUES_DIR"
       #[ ! -z "$i_desc" ] && {
@@ -1877,7 +1879,6 @@ case $action in
     [ "$reply" == "quit" ] && {
       [ $modified -gt 0 ] && {
       mtitle=`tsv_get_title $item`
-      #body=`PRI_A=$NONE;DEFAULT=$NONE;print_item $item`
       body=`print_item $item`
         [ ! -z "$EMAIL_TO" ] && echo -e "$body" | mail -s "[MOD] $mtitle" $EMAIL_TO
         }
@@ -1968,6 +1969,7 @@ case $action in
                    text=$(cat $TMP_FILE)
                    # tsv stuff
                    update_extra_data $item $reply "$text"
+
                    [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && {
                    start=$(sed -n "/^$reply:/=" $file)
                    let end=$start+$lines
@@ -1993,7 +1995,6 @@ x
             esac
 
 
-        # actually we need to let user edit existing value in editor
     fi
 done # while true
        cleanup;;
@@ -2187,7 +2188,7 @@ note: PRIORITY must be anywhere from A to Z."
             echo "No item passed. Showing last one ($item)"
         }
         #common_validation $item $errmsg
-        data=$( print_item "$1" | sed 's/^\([[a-zA-Z_ ]*\):/'$YELLOW'\1:'$DEFAULT'/g' )
+        data=$( print_item "$item" | sed 's/^\([[a-zA-Z_ ]*\):/'$YELLOW'\1:'$DEFAULT'/g' )
         echo -e "$data"
 
         ;;
