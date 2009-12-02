@@ -104,13 +104,19 @@ shorthelp()
         canceled|can NUMBER
         stopped|sto  NUMBER
      
+        chpri   ITEM1...ITEMn P[1-5]
+        chstart ITEM1...ITEMn YYYY-MM-DD
+        chstart ITEM1...ITEMn +n
+
       Listings:
         list|ls [TERM...]
         grep REGEX
         lbs
         oldest [COUNT]
         newest [COUNT]
-        quick|q
+        quick | q
+        recentlog | rl
+        recentcomment | rc
         show [NUMBER]
         status
         upcoming|upc 
@@ -192,12 +198,14 @@ help() # COMMAND: shows help
           Adds PRIORITY to todo on line NUMBER.  If the item is already
           prioritized, replaces current priority with new PRIORITY.
           PRIORITY must be an uppercase letter between A and Z.
+          (May be obsoleted, adds A-Z in summary itself. See chpri)
 
         show NUMBER
           shows an item, defaults to last
 
         lbs
           Lists bugs by severity.
+          (may be obsoleted, in favor of new priority column. See chpri)
 
         selectm "type: BUG" "status: OPE" ...
         selm "type=bug" "status=(open|started)" "severity=critical"
@@ -241,12 +249,22 @@ help() # COMMAND: shows help
 
         recentlog 
         rl
-        list recent activity from logs
+           list recent activity from logs
 
         recentcomments 
         rc
-        list recent comments
+           list recent comments
 
+        chpri   ITEM1...ITEMn P[1-5]
+           change the priority of item/s. 
+
+        chstart ITEM1...ITEMn YYYY-MM-DD
+           change the scheduled start date of item/s to the given absolute date
+        chstart ITEM1...ITEMn +n
+           change the scheduled start date of item/s to the date relative to today.
+
+        desc ITEM# [text]
+           sets or appends detailed description to description of item
 EndHelp
 if [ -d "$TSV_ACTIONS_DIR" ]
 then
@@ -1753,6 +1771,8 @@ shift
     shift $shifted
     # FUTURE one can check for opt_help or if --help passed and pass to another function which has detailed help
     #set | grep '^opt_'
+
+
 case $action in
     "print" ) # COMMAND: print details of one item
     print_item $1
@@ -1780,6 +1800,7 @@ case $action in
     i_desc=$( echo "$i_desc" | tr -cd '\12\15\40-\176' )
     append_extra_data "$item" "description" "$i_desc"
     ;;
+
 "add" | "a") # COMMAND: add an item (bug/task/enhancement)
     if [[ -z "$1" ]]; then
         echo -n "Enter a short summary: "
