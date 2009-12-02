@@ -1178,6 +1178,9 @@ pretty_print(){
     tomorrow=$( date_calc +1 )
     today="$TSV_NOW_SHORT"
 
+         #   -e  "/${DELIM}${tomorrow}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_A}\2${DEFAULT}/g" \
+         #   -e  "/${DELIM}${dayafter}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_B}\2${DEFAULT}/g" \
+         #   -e  "/${DELIM}${today}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_C}\2${DEFAULT}/g" \
     #dayafter=`date --date="+2 days" '+%Y-%m-%d'`
     dayafter=$( date_calc +2 )
     if (( $TSV_PRETTY_PRINT > 0 ));
@@ -1199,9 +1202,6 @@ pretty_print(){
             -e  "/${DELIM}TAS${DELIM}/s/TAS/./" \
             -e  "/${DELIM}FEA${DELIM}/s/FEA/ /" \
             -e  "/${DELIM}ENH${DELIM}/s/ENH/ /" \
-            -e  "/${DELIM}${tomorrow}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_A}\2${DEFAULT}/g" \
-            -e  "/${DELIM}${dayafter}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_B}\2${DEFAULT}/g" \
-            -e  "/${DELIM}${today}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_C}\2${DEFAULT}/g" \
             -e  "s/${tomorrow}/${PRI_A}${tomorrow}${DEFAULT}/g" \
             -e  "s/${dayafter}/${PRI_B}${dayafter}${DEFAULT}/g" \
             -e  "s/${today}/${PRI_C}${today}${DEFAULT}/g" \
