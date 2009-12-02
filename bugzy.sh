@@ -304,7 +304,7 @@ ask(){
         then
             defaultstring=""
             [ ! -z "$defaultval" ] && defaultstring="[$defaultval]"
-            echo "${promptstring}${defaultstring}: "
+            echo "${promptstring} ${defaultstring}: "
         fi
         let ctr=1
         valid=" "
@@ -396,6 +396,7 @@ IFS="$oldIFS"
 hash_set "VALUES" "status" "open started closed stopped canceled "
 hash_set "VALUES" "severity" "normal critical moderate"
 hash_set "VALUES" "type" "bug feature enhancement task"
+hash_set "VALUES" "priority" "P1 P2 P3 P4 P5"
 hash_set "TSVVALUES" "status" "OPE STA CLO STO CAN"
 hash_set "TSVVALUES" "severity" "NOR CRI MOD"
 hash_set "TSVVALUES" "type" "BUG FEA ENH TAS"
@@ -825,7 +826,7 @@ add_fix(){
         text=$(cat $TMP_FILE)
         howmanylines=$( echo -e "$text" | wc -cl | tr -s ' ' | sed 's/^ /(/;s/$/)/;s# #/#')
         update_extra_data $item $reply "$text"
-        log_changes1 $reply "#$item Fix added $howmanylines. ${text:0:40}..."
+        log_changes1 $reply "#$item Fix added. ${text:0:40}... $howmanylines"
         let modified+=1
     }
 }
@@ -979,9 +980,11 @@ tsv_get_column_value(){
     paditem=$( printf "%4s" $item )
     rowdata=$( grep "^$paditem" "$TSV_FILE" )
     [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; return;}
-    index=`tsv_column_index "$field"`
-    [ $index -lt 0 ] && { echo "ERROR FIELDNAME $2"; return;}
-    echo "$rowdata" | cut -d $'\t' -f $index
+    #index=`tsv_column_index "$field"`
+        get_column_index "$field"
+        index=$colindex
+    [ -z "$index" -o "$index" -lt 0 ] && { echo "ERROR FIELDNAME $2"; return;}
+    echo "$rowdata" | cut -d $'\t' -f$index
 }
 tsv_get_index_value(){
     item="$1"
@@ -1350,7 +1353,7 @@ create_tsv_file()
     KEY=$( printf "%4s" "$serialid" )
     paditem="$KEY"
     tabcommentcount="   "
-    tabpri="P3"
+    tabpri=${i_priority:-"P3"}
     tabtimestamp=$(date +%s)
     TSV_NOW=`date "$TSV_DATE_FORMAT"`
       [  -z "$i_desc" ] && { i_desc=""; }
@@ -1874,7 +1877,7 @@ case $action in
     while true
     do
         CHOICES="$MAINCHOICES"
-    ask "Select field to edit"
+    ask "Select field to edit" "quit"
     reply=$ASKRESULT
     [ "$reply" == "quit" ] && {
       [ $modified -gt 0 ] && {
@@ -1956,6 +1959,24 @@ case $action in
                    let modified+=1
                 }
             ;;
+            "start_date" )
+            read start_date
+            [[ ${start_date:0:1} == "+" ]] && conversion_done=1;
+            [ ! -z "$start_date" ] && { start_date=`convert_due_date "$start_date"`
+            if [[ $conversion_done == 1 ]];
+            then
+                echo "Start date converted to $start_date"
+            fi
+            text="$start_date"
+                   F[ $TSV_START_DATE_COLUMN1 ]="$text"
+                   update_row 
+
+                   log_changes1 $reply "#$item $reply changed from ${oldvalue} to ${text}"
+                   [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak "/^$reply:/s/^.*$/$reply: $text/" $file
+                   #show_diffs 
+                   let modified+=1
+                }
+            ;;
             "description" | "fix" )
                 description=$( get_extra_data $item $reply )
                 oldvalue="$description"
@@ -1991,6 +2012,12 @@ x
     #rm $file.bak.1
                 }
                 
+                ;;
+                *) 
+                echo "------------------------------------------------------"
+                echo "Oops! Tell author to get cracking on edit of $reply"
+                echo "------------------------------------------------------"
+                echo
                 ;;
             esac
 
