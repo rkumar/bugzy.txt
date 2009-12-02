@@ -616,18 +616,20 @@ get_code()
 }
 
 ## get input from user, if user hits enter use default value
-## get_input "username" "john"
+## user_input "username" "john"
 ## returns value in RESULT
-get_input()
+
+user_input()
 {
     local field=$1
     local defval="$2"
     local prompts=""
     local input
     
-    [ ! -z defval ] && local prompts=" [default is $defval]"
+    [ ! -z "$defval" ] && local prompts=" [default is $defval]"
     echo -n "Enter ${field}${prompts}: "
     read input
+    [ -n "$input" ] && eval $2=\$input
     [ -z "$input" ] && input="$defval"
     RESULT=$input
 }
@@ -745,12 +747,13 @@ common_validation()
     # tsv stuff
  ## sets rowdata and lineno
     tsv_get_rowdata_with_lineno "$KEY"
+    [ $? -ne 0 ] && die "No such item: ($item)"
 
+    [ -z "$lineno" -o "$lineno" -lt 1 ] && die "No such item: $item"
     ## creates rowarr
     convert_row_to_array
     G_TITLE=${F[ $TSV_TITLE_COLUMN1  ]}
     G_STATUS="${F[ $TSV_STATUS_COLUMN1 ]}"
-    [ $lineno -lt 1 ] && die "No such item: $item"
     [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$G_TITLE"
 }
 
@@ -975,7 +978,7 @@ tsv_get_rowdata(){
     item="$1"
     paditem=$( printf "%4s" $item )
     rowdata=$( grep "^$paditem" "$TSV_FILE" )
-    [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; return 99;}
+    [ -z "$rowdata" ] && { echo "ERROR ITEMNO $1"; exit 1;}
     echo "$rowdata"
 }
 ## Do not call with $() or ``. This does not return values
@@ -984,7 +987,7 @@ tsv_get_rowdata_with_lineno(){
     local key="$1" # padded
     #paditem=$( printf "%4s" $item )
     rowdata=$( grep -n "^$key" "$TSV_FILE" )
-    [ -z "$rowdata" ] && { echo "ERROR ITEMNO ($1)"; return 99;}
+    [ -z "$rowdata" ] && { echo "ERROR ITEMNO ($1)"; exit 1;}
     lineno=${rowdata%%:*}
     rowdata=${rowdata#*:}
     G_LINENO=$lineno
@@ -1208,7 +1211,8 @@ pretty_print(){
             -e  "s/${DELIM}MOD${DELIM}/${DELIM}${PRI_B}MOD${DEFAULT}${DELIM}/g" \
             -e  "/${DELIM}P1${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_A}\2${DEFAULT}/g" \
             -e  "/${DELIM}P2${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_B}\2${DEFAULT}/g" \
-            -e  "s/${DELIM}\(P[12]\)${DELIM}/${DELIM}${PRI_A}\1${DEFAULT}${DELIM}/g" \
+            -e  "s/${DELIM}\(P1\)${DELIM}/${DELIM}${PRI_A}\1${DEFAULT}${DELIM}/g" \
+            -e  "s/${DELIM}\(P2\)${DELIM}/${DELIM}${PRI_B}\1${DEFAULT}${DELIM}/g" \
         -e "s/${DELIM} $//" \
         -e "s/${DELIM}\(([0-9]\{1,\})\)$/ \1/" \
             -e  "/^....${DELIM}CLO${DELIM}/s/CLO/x/" \
@@ -1869,16 +1873,15 @@ case $action in
 
 
     process_quadoptions  "$SEND_EMAIL" "Send file by email?"
-    #[ $RESULT == "yes" ] && get_input "emailid" "$ASSIGNED_TO"
+    #[ $RESULT == "yes" ] && user_input "emailid" "$ASSIGNED_TO"
     [ "$RESULT" == "yes" ] && {
-        get_input "emailid" "$EMAIL_TO"
-
-        ## TODO does this actually take updated email. i've nevr tried changnig.
+        user_input "emailid" "$EMAIL_TO"
+        EMAIL_TO="$RESULT"
 
         [ ! -z "$EMAIL_TO" ] && { 
             #body=`PRI_A=$NONE;DEFAULT=$NONE;print_item $item`
             body=`print_item $item`
-            echo -e "$body" | mail -s "$todo" $EMAIL_TO
+            echo -e "$body" | mail -s "$todo" "$EMAIL_TO"
         }
     }
     echo "Created $serialid"
@@ -2073,7 +2076,7 @@ opt_fields=${opt_fields:-"1,2,4,$TSV_START_DATE_COLUMN1,$TSV_DUE_DATE_COLUMN1,$T
     [ -z "$status" ] && die "$errmsg"
     status=$( printf "%s\n" "$status" | tr 'a-z' 'A-Z' )
 
-    opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
+    opt_fields=${opt_fields:-"1-4,6,7,$TSV_COMMENT_COUNT_COLUMN1,$TSV_PRIORITY_COLUMN1,$TSV_TITLE_COLUMN1"}
     ## all except given status, if - prepended e.g. -CLO
     FLAG=""
     [[ ${status:0:1} == "-" ]] && {
@@ -2095,7 +2098,7 @@ opt_fields=${opt_fields:-"1,2,4,$TSV_START_DATE_COLUMN1,$TSV_DUE_DATE_COLUMN1,$T
     ;;
 
 
-"selectm" | "selm") # COMMAND: allows multiple criteria selection key value
+"selectm" | "selm") # COMMAND: list items,  multiple criteria selection key value
     valid="|status|date_created|severity|type|"
     errmsg="usage: $TSV_PROGNAME $action \"type=BUG\" \"status=OPE\" ..."
     [ -z "$1" ] && die "$errmsg"
@@ -2152,6 +2155,7 @@ opt_fields=${opt_fields:-"1,2,4,$TSV_START_DATE_COLUMN1,$TSV_DUE_DATE_COLUMN1,$T
 ## sub-options: --sort  - a field number to sort on, default 3. e.g. --sort="2 -r"
 ##              --sort sorts on original field list, so as to continue sorting on SEVERITY
 ##+               even after the fields are reduced
+##+ move to addons TODO
     echo
     echo " ---   Listing of issues sorted by severity  --- "
     echo
@@ -2185,7 +2189,7 @@ opt_fields=${opt_fields:-"1,2,4,$TSV_START_DATE_COLUMN1,$TSV_DUE_DATE_COLUMN1,$T
     ;;
     
     "ope" | "sta" | "clo" | "can" | "sto" | \
-    "open" | "started" | "closed" | "canceled" | "stopped" ) # COMMAND change status of given item/s
+    "open" | "started" | "closed" | "canceled" | "stopped" ) # COMMAND: change status of given item/s
     [ ${#action} -eq 3 ] && action=$(echo "$action" | sed 's/sta/started/;s/can/canceled/;s/clo/closed/;s/sto/stopped/;s/ope/open/')
     for item in "$@"
     do
@@ -2272,7 +2276,8 @@ note: PRIORITY must be anywhere from A to Z."
 
             #TODO headers and pipe separator
             #TODO remove CLO
-"upcoming" | "upc" ) # COMMAND: shows upcoming tasks
+"upcoming" | "upc" ) # COMMAND: list upcoming tasks
+   # TODO a flag so you can see upcoming start dates
             # now check field 7, convert to unix epoch and compare to now, if greater.
             # if less then break out, no more printing
             ## CAUTION: this checks htat seventh column is due_date, if you change it may
@@ -2285,7 +2290,7 @@ note: PRIORITY must be anywhere from A to Z."
             echo 
             echo "   ---  Issues with Upcoming due dates --- "
             echo 
-            grep -v "${DELIM}CLO${DELIM}" "$TSV_FILE" \
+            grep -E -v "${DELIM}(CLO|CAN)${DELIM}" "$TSV_FILE" \
             | sort -t$'\t' -k7 -r  \
             | cut -d$'\t' -f1-$TSV_DUE_DATE_COLUMN1,$TSV_TITLE_COLUMN1 \
             | sed -e 's/OPE/-/g;s/CLO/x/g;s/STA/@/g;s/STO/$/g;s/CAN/x/g'  \
@@ -2353,14 +2358,14 @@ note: PRIORITY must be anywhere from A to Z."
 
             # put symbold in global vars so consistent TODO, color this based on priority
             # now that we've removed id from title, i've had to do some jugglery to switch cols
-"quick" | "q" ) # COMMAND a quick report showing status and title sorted on status
+"quick" | "q" ) # COMMAND: list. a quick report showing status and title sorted on status
         opt_fields=${opt_fields:-"1,2,4,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
         opt_postsort=${opt_postsort:-"2,2 -k5,5"}
         short_title
         generic_report "$@"
             ;;
 
-"lastmodified" | "lm" ) # COMMAND a quick report showing status and title sorted on status
+"lastmodified" | "lm" ) # COMMAND: list sorted on last modified
         opt_fields=${opt_fields:-"1,2,3,4,$TSV_COMMENT_COUNT_COLUMN1,$TSV_TITLE_COLUMN1"}
         #opt_postsort=${opt_postsort:-"$TSV_MODIFIED_COLUMN1 -r"}
         opt_sort=${opt_sort:-"$TSV_MODIFIED_COLUMN1 -r"}
@@ -2368,14 +2373,14 @@ note: PRIORITY must be anywhere from A to Z."
         legend
             ;;
 
-"grep" ) # COMMAND uses egrep to run a quick report showing status and title sorted on status
+"grep" ) # COMMAND: list uses egrep to run a quick report showing status and title sorted on status
             regex="$@"
             [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: grep : $@"
     #        short_title
-            echo "  Id  | B |      Title                                   "
-            echo "------+---+------------------------------------------------------"
+            echo "  Id  | B |Pri |      Title                                   "
+            echo "------+---+----+-------------------------------------------------"
     filter_data "$@" \
-    | cut -f1,2,4,$TSV_TITLE_COLUMN1  \
+    | cut -f1,2,4,$TSV_PRIORITY_COLUMN1,$TSV_TITLE_COLUMN1  \
     | sed -e  "s/^\(....\)${DELIM}\(...\)/\2\1/" \
           -e  's/^OPE/-/g;s/^CLO/x/g;s/^STA/@/g;s/^STO/$/g;s/^CAN/x/g'  \
           -e  's/BUG/#/g;s/ENH/ /g;s/FEA/ /g;s/TAS/./g;'  \
@@ -2385,7 +2390,7 @@ note: PRIORITY must be anywhere from A to Z."
    legend
             ;;
 
-"newest" ) # COMMAND a quick report showing  newest <n> items added
+"newest" ) # COMMAND: list items showing  newest <n> items added
         count=${1:-10}
         echo 
         echo "   --- Newest $count issues  ---"
@@ -2399,7 +2404,7 @@ note: PRIORITY must be anywhere from A to Z."
         show_source
             ;;
 
-"oldest" ) # COMMAND a quick report showing  oldest <n> items added
+"oldest" ) # COMMAND: list showing  oldest <n> items added
         count=${1:-10}
         echo 
         echo "   --- Oldest open/started $count issues  ---"
@@ -2507,18 +2512,11 @@ note: PRIORITY must be anywhere from A to Z."
     i_due_date=`convert_due_date "$DEFAULT_DUE_DATE"`
     ## check for -- settings, break into key and value
     OPT_PREFIX="i"
-    #getoptlong "$@"
-    #shift $shifted
     for arg in ${!opt_@}
     do
         read ${OPT_PREFIX}_${arg:4} <<< $( eval 'echo -n "$'$arg' "') 
     done
-    #echo "type:$i_type"
-    #echo "seve:$i_severity"
-    #echo "left: $i_rest"
     atitle=$*
-    #echo "title:$atitle"
-    #read
     [ -z "$atitle" ] && die "Title required for bug"
     #check title for newline at end, this could leave a blank line in file
     del=$DELIM
@@ -2606,7 +2604,7 @@ note: PRIORITY must be anywhere from A to Z."
 
     cleanup
     ;;
-"chpri" )
+"chpri" ) # COMMAND: change priority P1..5
     errmsg="usage: $TSV_PROGNAME $action ITEM# P1..5. "
 
     [ "$#" -lt 2 ] && die "(argc) $errmsg"
@@ -2627,7 +2625,7 @@ note: PRIORITY must be anywhere from A to Z."
     cleanup
     ;;
 
-"help" )
+"help" ) # COMMAND: detailed help
     help
     ;;
 * )
