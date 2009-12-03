@@ -185,11 +185,6 @@ help() # COMMAND: shows help
         oldest N
             a quick report showing  oldest <n> items added
 
-        listpri [PRIORITY]   TODO
-        lsp [PRIORITY]
-          Displays all items prioritized PRIORITY.
-          If no PRIORITY specified, lists all prioritized items.
-
         listproj   TODO
         lsprj
           Lists all the projects that start with the + sign in todo.txt.
@@ -2031,7 +2026,7 @@ opt_fields=${opt_fields:-"1,2,4,$TSV_START_DATE_COLUMN1,$TSV_DUE_DATE_COLUMN1,$T
 ## sub-options: --sort  - a field number to sort on, default 3. e.g. --sort="2 -r"
 ##              --sort sorts on original field list, so as to continue sorting on SEVERITY
 ##+               even after the fields are reduced
-##+ move to addons TODO
+##+ move lbs to addons TODO
     echo
     echo " ---   Listing of issues sorted by severity  --- "
     echo
@@ -2148,7 +2143,6 @@ note: PRIORITY must be anywhere from A to Z."
 
 
 
-            #TODO remove CLO ??
 "upcoming" | "upc" ) # COMMAND: list upcoming tasks
     ## if --start_date then use start_date
             # now check field 7, convert to unix epoch and compare to now, if greater.
@@ -2416,7 +2410,7 @@ note: PRIORITY must be anywhere from A to Z."
 ;;
 "qadd" ) # COMMAND: quickly add an issue from command line, no prompting
 ## b qadd --type=bug --severity=cri --due_date=2009-12-26 "using --params= command upc needs formatting"
-# validatoin required. TODO
+# qadd validatoin required. TODO
     i_type=${DEFAULT_TYPE:-"bug"}
     i_severity=${DEFAULT_SEVERITY:-"normal"}
     i_status=${DEFAULT_STATUS:-"open"}
@@ -2442,8 +2436,6 @@ note: PRIORITY must be anywhere from A to Z."
       
 ;;
 "recentlog" | "rl") # COMMAND: list recent logs
-    # TODO, we should show the title too , somehow
-    #grep ':log:' "$TSV_EXTRA_DATA_FILE" | tail -25 | cut -d : -f1,4- | sed 's/:/ | /1;s/~/ | /'
     tail -25 "$TSV_LOG_FILE" | cut -d $'\t' -f1,3- | sed 's/~/ | /'
     ;;
 "recentcomment" | "rc" ) # COMMAND: list recent comments 

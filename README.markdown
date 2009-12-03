@@ -98,6 +98,9 @@ sorted above. "depri" removes priority.
 "lbs"        # list by severity
         b lbs --fields:"1,3,4,7,8"   # display only given fields
 
+"upcoming" | "upc"  [--start-date=true]
+     list upcoming tasks based on due date (or optionally scheduled start date)
+
 **Add-ons** include `mdel`, `mpri`, `mdepri` which do multiple deletes or
 priority setting and unsetting.
 
