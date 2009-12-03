@@ -13,6 +13,7 @@
 # TODO - how to view archived data
 ## TODO - should be able to search text in desc, fix and comments
 ## TODO - too many mails, can we configure how many or what events.
+## use printf not echo where there are newlines in comment/desc etc
 # CAUTION: we are putting priority at start of title, and tags at end.
 #
 
@@ -119,7 +120,7 @@ shorthelp()
         recentcomment | rc
         show [NUMBER]
         status
-        upcoming|upc 
+        upcoming|upc [--start-date=true]
         viewlog  NUMBER
         viewcomment NUMBER
 
@@ -241,7 +242,10 @@ help() # COMMAND: shows help
 
         upcoming
         upc 
-          shows upcoming tasks
+          shows upcoming tasks based and sorted on due date
+
+        upcoming|upc --start-date=true
+          shows upcoming tasks based and sorted on scheduled start date
           
         viewlog  NUMBER
         viewcomment NUMBER
@@ -520,7 +524,6 @@ _list()
             rowitem=${rowitem// /}
             KEY=$( printf "%4s" $rowitem )
             if [[ "$rowitem" = +([0-9]) ]]; then  
-                # TODO OUCH now getextra reads from arraty which is not populated
                 tsv_get_column_value $rowitem "description" | sed '1s/^/      Desc: /;2,$s/^/      >/g;'
                 #get_extra_data $rowitem description | sed '1s/^/      Desc: /;2,$s/^/      >/g;'
                 get_extra_data $rowitem comment     | sed '1s/^/      Comments: /;2,$s/^/      >/g;'
@@ -1314,6 +1317,7 @@ getoptlong()
             # declare will be local when we move this to a function
             #declare i_${key}=$val
             # sorry, in this case we were setting i_ vars
+            key=${key//-/_}  # if hyphen used replace with _ so var can be created
             read ${OPT_PREFIX}_${key} <<< $val
             export ${OPT_PREFIX}_${key} 
             #echo " i_${key}=$val"
@@ -2144,33 +2148,47 @@ note: PRIORITY must be anywhere from A to Z."
 
 
 
-            #TODO headers and pipe separator
-            #TODO remove CLO
+            #TODO remove CLO ??
 "upcoming" | "upc" ) # COMMAND: list upcoming tasks
-   # TODO a flag so you can see upcoming start dates
+    ## if --start_date then use start_date
             # now check field 7, convert to unix epoch and compare to now, if greater.
             # if less then break out, no more printing
             ## CAUTION: this checks htat seventh column is due_date, if you change it may
             ##+ not show any data.
             #tomorrow=`date --date="tomorrow" '+%Y-%m-%d'`
+            #    today=$( date +%s )
+                # we need todays seconds from 00:00 not this moment
+            today=`date '+%Y-%m-%d'`
+            today=$( date --date="$today" +%s )
             tomorrow=$( date_calc +1 )
             #| cut -d $'\t' -f$opt_fields \
             opt_fields=${opt_fields:-"1-7,$TSV_TITLE_COLUMN1"}
 
+            if [ -z "$opt_start_date" -o "$opt_start_date" == "false" ]; then
+                datefield=7
+                txt="due"
+            else
+                datefield=6
+                txt="start"
+            fi
+
             echo 
-            echo "   ---  Issues with Upcoming due dates --- "
+            echo "   ---  Issues with Upcoming $txt dates --- "
             echo 
+            pretty_print_headers  |\
+            cut -d'|' -f1-$TSV_DUE_DATE_COLUMN1,$TSV_TITLE_COLUMN1 |\
+            sed 's/-|-/-+-/g'
+
             grep -E -v "${DELIM}(CLO|CAN)${DELIM}" "$TSV_FILE" \
-            | sort -t$'\t' -k7 -r  \
+            | sort -t$'\t' -k$datefield -r  \
             | cut -d$'\t' -f1-$TSV_DUE_DATE_COLUMN1,$TSV_TITLE_COLUMN1 \
             | sed -e 's/OPE/-/g;s/CLO/x/g;s/STA/@/g;s/STO/$/g;s/CAN/x/g'  \
             -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
             -e 's/BUG/#/g;s/ENH/./g;s/FEA/./g;s/TAS/,/g;' | \
-            ( while read LINE
+            ( while IFS='' read -r LINE
             do
-                due_date=$( echo "$LINE" | cut -d  $'\t' -f7 )
+                due_date=$( echo "$LINE" | cut -d  $'\t' -f$datefield )
                 currow=$( date --date="$due_date" +%s )
-                today=$( date +%s )
                 if [ $currow -ge $today ];
                 then
                     if [ $TSV_NOW_SHORT == ${due_date:0:10} ];
