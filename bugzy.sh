@@ -18,7 +18,7 @@
 
 #### --- cleanup code use at start ---- ####
 TMP_FILE=${TMPDIR:-/tmp}/prog.$$
-trap "rm -f $TMP_FILE.?; exit 1" 0 1 2 3 13 15
+trap "rm -f $TMP_FILE; exit 1" 0 1 2 3 13 15
 TSV_PROGNAME=$(basename "$0")
 TSV_PROGNAME_FULL_SH="$0"
 TODO_SH=$TSV_PROGNAME
@@ -96,7 +96,7 @@ shorthelp()
         help
         modify|mod NUMBER
         pri|p NUMBER PRIORITY
-        tag TAG ITEM1 ITEM1 ... ITEMn
+        tag ITEM1 ITEM1 ... ITEMn TAG
 
         open|ope     NUMBER
         started|sta  NUMBER
@@ -223,7 +223,7 @@ help() # COMMAND: shows help
           type, severity, status and due_date as arguments. No spaces in -- commands.
           
 
-        tag TAG item1 item1 ...
+        tag ITEM1 ITEM1 ... ITEMn TAG
           Appends a tag to multiple items, prefixing the tag with @
 
         print NUMBER
@@ -1785,8 +1785,6 @@ case $action in
 
 
 "modify" | "mod") # COMMAND: modify fields of an item
-## TODO : add pri
-## TODO : add start_date
     errmsg="usage: $TSV_PROGNAME $action task#"
     modified=0
     item=$1
@@ -2228,7 +2226,8 @@ note: PRIORITY must be anywhere from A to Z."
             # now that we've removed id from title, i've had to do some jugglery to switch cols
 "quick" | "q" ) # COMMAND: list. a quick report showing status and title sorted on status
         opt_fields=${opt_fields:-"1,2,4,$TSV_COMMENT_COUNT_COLUMN1,$TSV_PRIORITY_COLUMN1,$TSV_TITLE_COLUMN1"}
-        opt_postsort=${opt_postsort:-"2,2 -k5,5"}
+        #opt_postsort=${opt_postsort:-"2,2 -k5,5"}
+        opt_postsort=${opt_postsort:-"5,5"}
         short_title
         generic_report "$@"
             ;;
@@ -2289,7 +2288,7 @@ note: PRIORITY must be anywhere from A to Z."
         show_source
             ;;
 
-"tag" ) # COMMAND: adds a tag at end of title, with '@' prefixed, helps in searching.
+"oldtag" ) # COMMAND: adds a tag at end of title, with '@' prefixed, helps in searching.
  
             tag="@$1"
             errmsg="usage: $TSV_PROGNAME $action TAG ITEM#"
@@ -2305,6 +2304,23 @@ note: PRIORITY must be anywhere from A to Z."
                 update_row
                 log_changes1 "tag" "#$item tagged with $tag"
                 [ "$?" -eq 0 ] && echo "Tagged $item with $tag";
+            done
+            cleanup
+            ;;
+
+"tag" ) # COMMAND: adds a tag at end of title, with '@' prefixed, helps in searching.
+ 
+            tag="@${@: -1}"
+            errmsg="usage: $TSV_PROGNAME $action ITEM# TAG "
+            [ "$#" -lt 2 ] && die "(argc) $errmsg"
+            numargs=$#
+            for ((i=1 ; i < numargs ; i++)); do
+                common_validation "$1" "$errmsg"
+                F[$TSV_TITLE_COLUMN1]="$G_TITLE $tag"
+                update_row
+                [ "$?" -eq 0 ] && echo "Tagged $item with $tag";
+                log_changes1 "tag" "#$item tagged with $tag"
+                shift
             done
             cleanup
             ;;
