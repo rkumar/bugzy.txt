@@ -695,8 +695,7 @@ change_status()
         F[ $TSV_STATUS_COLUMN1]=$newcode
         update_row
         echo "$item is now $newcode ($input)"
-        #log_changes $reply "$oldvalue" $newcode $file
-        log_changes1 $reply "#$item $input"
+        log_changes1 $reply "#$item $input ($G_TITLE)"
         newline="$reply: $newcode"
         [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
         mtitle="$G_TITLE"
@@ -798,7 +797,6 @@ $text
 x
 !
 }
-        #log_changes "$reply" "$reply added.${loginput:0:25} ..." "${#loginput} chars" "$file"
         log_changes1 "$reply" "#$item $reply added. ${loginput:0:40} ...$howmanylines" 
         echo "Comment added to $item"
         [ "$TSV_ADD_COMMENT_COUNT_TO_TITLE" -gt 0 ] && add_comment_count_to_title;
@@ -1069,31 +1067,33 @@ pretty_print(){
          #   -e  "/${DELIM}${tomorrow}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_A}\2${DEFAULT}/g" \
          #   -e  "/${DELIM}${dayafter}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_B}\2${DEFAULT}/g" \
          #   -e  "/${DELIM}${today}${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_C}\2${DEFAULT}/g" \
+            #-e  "/${DELIM}P1${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_A}\2${DEFAULT}/g" \
+            #-e  "/${DELIM}P2${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_B}\2${DEFAULT}/g" \
+            #-e  "s/${DELIM}\(P1\)${DELIM}/${DELIM}${PRI_A}\1${DEFAULT}${DELIM}/g" \
+            #-e  "s/${DELIM}\(P2\)${DELIM}/${DELIM}${PRI_B}\1${DEFAULT}${DELIM}/g" \
+            #-e  "s/${DELIM}CRI${DELIM}/${DELIM}${PRI_A}CRI${DEFAULT}${DELIM}/g" \
+            #-e  "s/${DELIM}MOD${DELIM}/${DELIM}${PRI_B}MOD${DEFAULT}${DELIM}/g" \
+            #-e  "/${DELIM}NOR${DELIM}/s/NOR/   /" \
     #dayafter=`date --date="+2 days" '+%Y-%m-%d'`
     dayafter=$( date_calc +2 )
     if (( $TSV_PRETTY_PRINT > 0 ));
     then
         local data=$( sed -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
-            -e  "s/${DELIM}CRI${DELIM}/${DELIM}${PRI_A}CRI${DEFAULT}${DELIM}/g" \
-            -e  "s/${DELIM}MOD${DELIM}/${DELIM}${PRI_B}MOD${DEFAULT}${DELIM}/g" \
-            -e  "/${DELIM}P1${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_A}\2${DEFAULT}/g" \
-            -e  "/${DELIM}P2${DELIM}/s/\(.*\)${DELIM}\(.*\)$/\1${DELIM}${PRI_B}\2${DEFAULT}/g" \
-            -e  "s/${DELIM}\(P1\)${DELIM}/${DELIM}${PRI_A}\1${DEFAULT}${DELIM}/g" \
-            -e  "s/${DELIM}\(P2\)${DELIM}/${DELIM}${PRI_B}\1${DEFAULT}${DELIM}/g" \
-        -e "s/${DELIM} $//" \
-        -e "s/${DELIM}\(([0-9]\{1,\})\)$/ \1/" \
             -e  "/^....${DELIM}CLO${DELIM}/s/CLO/x/" \
             -e  "/^....${DELIM}CAN${DELIM}/s/CAN/x/" \
             -e  "/^....${DELIM}OPE${DELIM}/s/OPE/_/" \
             -e  "/^....${DELIM}STA${DELIM}/s/STA/@/" \
-            -e  "/${DELIM}NOR${DELIM}/s/NOR/   /" \
+            -e  "/${DELIM}P1${DELIM}/s/^.*$/${PRI_A}&${DEFAULT}/g" \
+            -e  "/${DELIM}P2${DELIM}/s/^.*$/${PRI_B}&${DEFAULT}/g" \
+        -e "s/${DELIM} $//" \
+        -e "s/${DELIM}\(([0-9]\{1,\})\)$/ \1/" \
             -e  "/${DELIM}BUG${DELIM}/s/BUG/#/" \
             -e  "/${DELIM}TAS${DELIM}/s/TAS/./" \
             -e  "/${DELIM}FEA${DELIM}/s/FEA/ /" \
             -e  "/${DELIM}ENH${DELIM}/s/ENH/ /" \
-            -e  "s/${tomorrow}/${PRI_A}${tomorrow}${DEFAULT}/g" \
-            -e  "s/${dayafter}/${PRI_B}${dayafter}${DEFAULT}/g" \
-            -e  "s/${today}/${PRI_C}${today}${DEFAULT}/g" \
+            -e  "s/${tomorrow}/${UL}${tomorrow}${ULOFF}/g" \
+            -e  "s/${dayafter}/${BOLD}${dayafter}${BOLDOFF}/g" \
+            -e  "s/${today}/${UL}${today}${ULOFF}/g" \
             -e "s/$DELIM/$TSV_OUTPUT_DELIMITER/g" 
             )
             echo -e "$data"
@@ -1575,6 +1575,14 @@ export LIGHT_PURPLE='\\033[1;35m'
 export LIGHT_CYAN='\\033[1;36m'
 export WHITE='\\033[1;37m'
 export DEFAULT='\\033[0m'
+export BOLD='\\033[1m'
+export BOLDOFF='\\033[22m'
+export STANDOUT='\\033[7m'
+export STANDOUTOFF='\\033[27m'
+export UL='\\033[4m'
+export ULOFF='\\033[24m'
+export BLINK='\\033[5m'
+export BLINKOFF='\\033[25m'
 
 # Default priority->color map.
 export PRI_A=$YELLOW        # color for A priority
@@ -1773,7 +1781,7 @@ case $action in
                 [ ! -d "$DELETED_DIR" ] && mkdir "$DELETED_DIR";
                 # tsv stuff
                 tsv_delete_item $item
-                log_changes1 "delete" "#$item deleted"
+                log_changes1 "delete" "#$item deleted ($mtitle)"
                 [ ! -z "$EMAIL_TO" ] && echo -e "$body" | mail -s "[DEL] $mtitle" $EMAIL_TO
                 [ $TSV_VERBOSE_FLAG -gt 0 ] && echo "Bugzy: '$mtitle' deleted."
                 cleanup
@@ -1823,7 +1831,6 @@ case $action in
         TSV_NOW=`date "$TSV_DATE_FORMAT"`
         [ "$oldvalue" == "$newcode" ] && { die "$item is already $oldvalue ($longcode)"; }
         set_update_row $reply $newcode
-        #log_changes $reply $oldvalue $newcode $file
         log_changes1 $reply "#$item $reply changed from $oldvalue to $newcode"
         newline="$reply: $newcode" # for FLAT file
         [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak -e "/^$reply: /s/.*/$newline/" $file
@@ -1839,7 +1846,6 @@ case $action in
                    text=$(cat $TMP_FILE)
                    F[ $TSV_TITLE_COLUMN1 ]="$text"
                    update_row
-                   #log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
                    log_changes1 $reply "#$item $reply changed to ${text:0:40}..."
                    [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak "/^$reply:/s/^.*$/$reply: $text/" $file
                    #show_diffs 
@@ -1867,7 +1873,6 @@ case $action in
                    F[ $TSV_DUE_DATE_COLUMN1 ]="$text"
                    update_row 
 
-                   #log_changes $reply "${oldvalue}" "${text}" "$file"
                    log_changes1 $reply "#$item $reply changed from ${oldvalue} to ${text}"
                    [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && sed -i.bak "/^$reply:/s/^.*$/$reply: $text/" $file
                    #show_diffs 
@@ -1904,7 +1909,6 @@ $text
 x
 !
 }
-        #log_changes $reply "${#oldvalue} chars" "${#text} chars" "$file"
         howmanylines=$( echo -e "$text" | wc -cl | tr -s ' ' | sed 's/^ /(/;s/$/)/;s# #/#')
         log_changes1 $reply "#$item $reply changed. ${text:0:40}...$howmanylines"
                    let modified+=1
@@ -2325,7 +2329,6 @@ note: PRIORITY must be anywhere from A to Z."
             cleanup
             ;;
 
-            # what if one fix to be attached to several bugs ?
 "fix" | "addfix" ) # COMMAND: add a fix / resolution for given item
         errmsg="usage: $TSV_PROGNAME $action ITEM# [fix text]"
         common_validation $1 $errmsg 
@@ -2395,7 +2398,6 @@ note: PRIORITY must be anywhere from A to Z."
 ;;
 "qadd" ) # COMMAND: quickly add an issue from command line, no prompting
 ## b qadd --type=bug --severity=cri --due_date=2009-12-26 "using --params= command upc needs formatting"
-# TODO can we start with a priority too?
 # validatoin required. TODO
     i_type=${DEFAULT_TYPE:-"bug"}
     i_severity=${DEFAULT_SEVERITY:-"normal"}
