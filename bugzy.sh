@@ -92,7 +92,7 @@ shorthelp()
         #command [ACTIONS] 
         del|rm NUMBER 
         dp|depri NUMBER
-        fix|addfix
+        fix|addfix NUMBER [text]
         help
         modify|mod NUMBER
         pri|p NUMBER PRIORITY
@@ -161,8 +161,8 @@ help() # COMMAND: shows help
         dp NUMBER
           Deprioritizes (removes the priority) from the item
 
-        fix    NUMBER
-        addfix NUMBER
+        fix    NUMBER [text]
+        addfix NUMBER [text]
           add a fix / resolution for given item
 
         grep REGEX
@@ -2327,11 +2327,16 @@ note: PRIORITY must be anywhere from A to Z."
 
             # what if one fix to be attached to several bugs ?
 "fix" | "addfix" ) # COMMAND: add a fix / resolution for given item
-        errmsg="usage: $TSV_PROGNAME $action ITEM#"
+        errmsg="usage: $TSV_PROGNAME $action ITEM# [fix text]"
         common_validation $1 $errmsg 
         tsv_get_title $item
-        echo "Enter a fix or resolution for $item"
-        add_fix $item
+        if [ $# -gt 1 ]; then
+            shift
+            append_extra_data $item "fix" "$*"
+        else
+            echo "Enter a fix or resolution for $item"
+            add_fix $item
+        fi
         echo "Updated fix $item. To view, use: show $item"
         cleanup
 
