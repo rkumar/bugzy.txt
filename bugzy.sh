@@ -861,6 +861,7 @@ formatted_tsv_headers(){
     echo "  Id |Statu|Sever|Type |Assigned To | Start Date |  Due Date  | CC  | Pri |     Title  "
     echo "-----|-----|-----|-----|------------|------------|------------|-----|-----|-------------------"
 }
+export -f formatted_tsv_headers 
 ## headers to print
 ## these should be in the same order as data in TSV
 ## Caller cuts the fields from here based on which fields are being displayed, using the pipe
@@ -1296,7 +1297,6 @@ getoptlong()
 {
     ## check for -- settings, break into key and value
     ## no spaces, :  used to delimit key and value
-    ## WHY are we using : and not =, is it because of that crappy old file format
     ## 2009-11-30 11:59 changed sep to =
     #echo "inside getoptl"
     shifted=0
@@ -1497,6 +1497,7 @@ filter_data(){
         #filtered_items=$items
     fi
 }
+export -f filter_data
 
 ## expects start_date to be set.
 ## converts if required and stores
@@ -1647,7 +1648,7 @@ fi
 
 #action=$( printf "%s\n" "$1" | tr 'A-Z' 'a-z' )
 shift
-  # we should do this earlier so that custom progs also get these params XXX
+  # TODO we should do this earlier so that custom progs also get these params XXX
     getoptlong "$@"
     shift $shifted
     # FUTURE one can check for opt_help or if --help passed and pass to another function which has detailed help
@@ -2018,45 +2019,6 @@ opt_fields=${opt_fields:-"1,2,4,$TSV_START_DATE_COLUMN1,$TSV_DUE_DATE_COLUMN1,$T
     | cut -d $'\t' -f$opt_fields \
     | pretty_print
     
-    ;;
-
-"lbs") # COMMAND: list by severity
-## b lbs --fields="1,3,4,7,8"
-## sub-options: --fields  - a field list compatible with cut command
-## sub-options: --sort  - a field number to sort on, default 3. e.g. --sort="2 -r"
-##              --sort sorts on original field list, so as to continue sorting on SEVERITY
-##+               even after the fields are reduced
-##+ move lbs to addons TODO
-    echo
-    echo " ---   Listing of issues sorted by severity  --- "
-    echo
-    opt_fields=${opt_fields:-"1-7,$TSV_TITLE_COLUMN1"}
-    if [ -z "$opt_fields" ]; then
-        formatted_tsv_headers
-    else
-        formatted_tsv_headers | cut -d '|' -f$opt_fields
-    fi
-    if [ -z "$opt_sort" ]; then
-        opt_sort=$TSV_SEVERITY_COLUMN1
-    fi
-    data=$( 
-    filter_data "$@" \
-        | sort -t$'\t' -k$opt_sort \
-        | cut -d $'\t' -f$opt_fields  \
-        | sed -e "s/${DELIM}\(....-..-..\) ..:../$DELIM\1/g;" \
-            -e  "/${DELIM}CRI${DELIM}/s/.*/${PRI_A}&${DEFAULT}/" \
-            -e  "/${DELIM}MOD${DELIM}/s/.*/${PRI_B}&${DEFAULT}/" \
-            -e "s/$DELIM/$TSV_OUTPUT_DELIMITER/g"  \
-        )
-        echo -e "$data"
-
-        [ $TSV_VERBOSE_FLAG -gt 1 ] && { echo; echo  "Listing is sorted on field 3. You may reduce fields by using the --fields option. e.g. --fields=\"1,2,3,5,8\""; 
-        echo
-        echo "To change sort order, use --sort=n"
-        echo "--sort=\"2 -r\""
-        echo "sort field numbers pertain to _original_ field numbers"
-    
-    }
     ;;
     
     "ope" | "sta" | "clo" | "can" | "sto" | \
