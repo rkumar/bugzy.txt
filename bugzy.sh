@@ -1315,10 +1315,11 @@ getoptlong()
             key=${key//-/_}  # if hyphen used replace with _ so var can be created
             read ${OPT_PREFIX}_${key} <<< $val
             export ${OPT_PREFIX}_${key} 
-            #echo " i_${key}=$val"
+            #echo " ${OPT_PREFIX}_${key}=$val"
             ((shifted+=1))
             shift
         else
+            #echo "getopt got $1"
             break
         fi
     done
@@ -1521,6 +1522,19 @@ update_start_date(){
             let modified+=1
         }
 }
+## returns fields in order given
+## wish i had seen this before!!!
+## grep "regex" $TSV_FILE | cut_fields '2,1,10,9'
+## sort -d$'\t' -k7,7 $TSV_FILE | cut_fields '2,1,10,9'
+## If you have set CRITERIA it will get evaluated.
+##+ e.g. CRITERIA='$2 == "OPE" || $2 == "STA"'
+cut_fields()
+{
+    p=\$$( echo $1 | sed 's/,/,\$/g' )
+    #eval "awk -F$'\t' -v o=$'\t' 'BEGIN{OFS=o} {print $p }'" $*
+    awk -F$'\t' -v o=$'\t' 'BEGIN{OFS=o}'"$CRITERIA"' {print '$p' }' #"$TSV_FILE"
+}
+
 ## ADD FUNCTIONS ABOVE
 out=
 file=
@@ -1642,17 +1656,18 @@ then
     action=$( printf "%s\n" "$1" | tr 'A-Z' 'a-z' )
 elif [ -d "$TSV_ACTIONS_DIR" -a -x "$TSV_ACTIONS_DIR/$action" ]
 then
+    shift
+    getoptlong "$@"
+    shift $shifted
     "$TSV_ACTIONS_DIR/$action" "$@"
     cleanup
 fi
 
 #action=$( printf "%s\n" "$1" | tr 'A-Z' 'a-z' )
 shift
-  # TODO we should do this earlier so that custom progs also get these params XXX
     getoptlong "$@"
     shift $shifted
     # FUTURE one can check for opt_help or if --help passed and pass to another function which has detailed help
-    #set | grep '^opt_'
 
 
 case $action in
