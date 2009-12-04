@@ -1,0 +1,60 @@
+#!/bin/bash
+#-------------------------------------------------------#
+# prints issues that should have started or closed
+# on or before today.
+# @param 7 : use column 7 (due date) for sort and date comparison
+#        6 : use column 6 (sta date) for sort and date comparison
+# 
+#-------------------------------------------------------#
+action=$1
+shift
+
+[ "$action" = "usage"  ] && {
+  echo "    overdue [--started=1]"
+  echo "    overdue "
+  echo "       list items that should have completed"
+  echo "    overdue --start=1"
+  echo "       list items that should have started"
+  echo ""
+  exit
+}
+ff=7
+[ ! -z "$opt_started" ] && ff=6
+
+case $ff in
+    7)  text="closed" 
+        crit='$2 == "OPE" || $2 == "STA"'
+    ;;
+    6)  text="started" 
+        crit='$2 == "OPE"'
+    ;;
+    *)
+        echo "Error. Should be 6 or 7"
+        exit 1
+    ;;
+esac
+
+echo
+echo " --- Issues that should have $text by today --- "
+echo
+echo "-----+-----+-----+------------+------------+----+---------------------------"
+echo " Id  | Sta | Type| Start Date |  Due Date  | Pri| Summary "
+echo "-----+-----+-----+------------+------------+----+---------------------------"
+
+sort -t$'\t' -k$ff,$ff data.tsv \
+| gawk -F$'\t' 'BEGIN{OFS=" | ";today=systime()}
+{ 
+    if ('"$crit"'){
+        str=$'$ff';
+        gsub(/-/," ", str)
+        str=str " 00 00 00"
+        ts=mktime(str)
+        if (ts <= today){
+            print $1, $2, $4,$6, $7,$9,$10 }
+        else { 
+            #print "Skippping..." $1, $6;
+            exit;
+        }
+    }
+    
+}'
