@@ -101,6 +101,10 @@ sorted above. "depri" removes priority.
 "upcoming" | "upc"  [--start-date=true]
      list upcoming tasks based on due date (or optionally scheduled start date)
 
+"overdue" [--started=1]
+     list tasks that should have finished (or started) by now
+     (an addon that uses GNU's `gawk`)
+
 **Add-ons** include `mdel`, `mpri`, `mdepri` which do multiple deletes or
 priority setting and unsetting.
 
@@ -109,6 +113,8 @@ TO ADD MORE HERE.
 You may also alias bugzy to "b" in ~/.bashrc or equivalent.
 
      alias b='bugzy -d ~/bugzy.cfg'  
+     alias bq='b q -CLO -CAN'
+
      b add "Module aaa crashes on startup"  
      b show
      b list  
