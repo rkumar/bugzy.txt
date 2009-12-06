@@ -1,6 +1,12 @@
 #!/bin/bash
 #
-# A simple file based bug tracker                       
+#*******************************************************#
+#                        bugzy.sh                       #
+#                 written by Rahul Kumar                #
+#                    December 05, 2009                  #
+#                                                       #
+#             A simple file-based bug tracker           #
+#*******************************************************#
 #                                                       
 # 2009-11-24 v0.1.12 - am removing old flat file creation
 # 2009-11-29 v0.1.14 - added modified timestamp and comment count in tsv file
@@ -10,11 +16,11 @@
 # rkumar                                                
 # 
 # 
-# TODO - how to view archived data
-## TODO - should be able to search text in desc, fix and comments
-## TODO - too many mails, can we configure how many or what events.
-## use printf not echo where there are newlines in comment/desc etc
-# CAUTION: we are putting priority at start of title, and tags at end.
+# TODO - how to view archived data                                     #
+# TODO - should be able to search text in desc, fix and comments       #
+# TODO - too many mails, can we configure how many or what events.     #
+## use printf not echo where there are newlines in comment/desc etc    #
+# CAUTION: we are putting priority at start of title, and tags at end. #
 #
 
 #### --- cleanup code use at start ---- ####
@@ -23,7 +29,6 @@ trap "rm -f $TMP_FILE; exit 1" 0 1 2 3 13 15
 TSV_PROGNAME=$(basename "$0")
 TSV_PROGNAME_FULL_SH="$0"
 TODO_SH=$TSV_PROGNAME
-#TODO_DIR="/Users/rahul/work/projects/rbcurse"
 export TSV_PROGNAME
 Date="2009-12-02"
 TSV_DATE_FORMAT='+%Y-%m-%d %H:%M'
@@ -68,8 +73,6 @@ TSV_CREATE_FLAT_FILE=0
 TSV_WRITE_FLAT_FILE=0
 TSV_TXT_FORCE=0
 TSV_ADD_COMMENT_COUNT_TO_TITLE=1
-#ext=${1:-"default value"}
-#today=$(date +"%Y-%m-%d-%H%M")
 
 #TSV_DEFAULT_ACTION="list" # this should be in a CFG file not here.
 oneline_usage="$TSV_PROGNAME [-fhpantvV] [-d todo_config] action [task_number] [task_description]"
@@ -90,7 +93,7 @@ shorthelp()
         add|a "Fix calculation in +project @context"
         archive|ar
         comment|addcomment NUMBER
-        #command [ACTIONS] 
+        command [ACTIONS] 
         del|rm NUMBER 
         dp|depri NUMBER
         fix|addfix NUMBER [text]
@@ -291,16 +294,8 @@ cleanup()
     [[ ! -z "$bak" && -f "$bak" ]] && rm "$bak"
     exit 0
 }
-oldask()
-{
-    select CHOICE in $CHOICES
-    do
-        echo "$CHOICE"
-        return
-    done
-}
 
-
+# ------------------------------------------------------------ # 
 ## presents choices to user
 ## allows user to press ENTER and puts default into reply.
 ## adds 'q' option to quit and returns "quit"
@@ -310,6 +305,7 @@ oldask()
 #CHOICES="bread butter jam cheese"
 #ask "Please select your breakfast" "jam"
 #echo "i got $ASKRESULT."
+# ------------------------------------------------------------ # 
 ask(){
     promptstring="$1"
     defaultval="$2"
@@ -355,7 +351,6 @@ ask(){
         fi
     done
 }
-## XXX CAN ONLY BE USED GLOBALLY
 ## will NOT work in echo | while read LINE
 ## instead use for LINE in $( echo -e "$data" )
 Hash_config_varname_prefix=__hash__
@@ -418,7 +413,8 @@ hash_set "TSVVALUES" "status" "OPE STA CLO STO CAN"
 hash_set "TSVVALUES" "severity" "NOR CRI MOD"
 hash_set "TSVVALUES" "type" "BUG FEA ENH TAS"
 
-# edits temporary file, remember to cleanup after
+## Used to edit multi-line text
+## edits temporary file
 edit_tmpfile()
 {
             mtime=`stat -c %Y $TMP_FILE`
@@ -551,24 +547,23 @@ _list()
 
     fi
 }
-log_changes1()
+# ---------------------------------------------------------------------- #
+# log_changes1 ()                                                        #
+# logs changes to blog.tsv                                               #
+# Called from all update methods                                         #
+# Parameter: fieldname, text                                             #
+#            accesses KEY (item) set by common-validation                #
+# Returns: 0 for success                                                 #
+# ---------------------------------------------------------------------- #
+log_changes1 ()
 {
-    local key=$1
-    local logtext="$2"
-    #local oldvalue=$2
-    #local newline=$3
-    #local file=$4
+    local key=$1         # field name
+    local logtext="$2"   # description to be logged
     local dlim="~"
     TSV_NOW=`date "$TSV_DATE_FORMAT"`
     [ -z "$KEY" ] && die "log_changes1: KEY blank"
     [ -z "$key" ] && die "log_c: key blank"
-    #[ -z "$oldvalue" ] && die "oldvalue blank"
-    #[ -z "$newline" ] && die "newline blank"
-    #[ -z "$file" ] && die "flat file name blank"
-    #data="- LOG${dlim}$TSV_NOW${dlim}$key${dlim}$oldvalue${dlim}$newline"
     data=$( echo -en "$logtext" | tr '\n' ' ')
-    # combined file, log in another file ?
-    #echo "$item:log:$key:$TSV_NOW${dlim}$data" >> "$TSV_EXTRA_DATA_FILE"
     echo "$KEY${DELIM}$key${DELIM}$TSV_NOW${dlim}$data" >> "$TSV_LOG_FILE"
     [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && echo "$data" >> $file
 
@@ -617,10 +612,16 @@ user_input()
     RESULT=$input
 }
 
-## converts +n to a date returning result
+# ---------------------------------------------------------------------- #
+# convert_due_date                                                       #
+# converts +n to a date                                                  #
+# Called when reading due date or start date                             #
+# Parameter: text entered by user for date (eith a date or +3 +2 etc)    #
+# Returns: echoes result                                                 #
+# ---------------------------------------------------------------------- #
 convert_due_date()
 {
-   local input="$1"
+   local input="$1"         # date or +n (relative days)
    local result
    if [ ${input:0:1} == '+' ];
    then
@@ -674,10 +675,16 @@ tsv_get_title()
     local mtitle=`tsv_get_column_value $item "title" `
     echo "$mtitle"
 }
+# ---------------------------------------------------------------------- #
+# change_status ()                                                       #
+# changes items state/status to given status (which is the action)       #
+# Parameter: item, action                                                #
+# Returns:                                                               #
+# ---------------------------------------------------------------------- #
 change_status()
 {
     item=$1
-    local action=$2
+    local action=$2          # new status such as clo sta etc
     errmsg="usage: $TSV_PROGNAME $action  ITEM#"
     errmsg+="\n       $TSV_PROGNAME $action [--fix=text] [--comment=text] ITEM#"
     common_validation $1 "$errmsg"
@@ -708,9 +715,17 @@ change_status()
             append_extra_data $item "fix" "$opt_fix"
         }
 }
-## for actions that require a bug id
-## sets item, file
-## sets rowdata and lineno by calling tsv_get_rowdata...
+# ---------------------------------------------------------------------- #
+# common_validation()                                                    #
+# validates given item number and retrieves record                       #
+# sets lineno, creates row array, sets KEY, item and paditem.            #
+# For actions that require a bug/item id                                 #
+# sets item, file                                                        #
+# sets rowdata and lineno by calling tsv_get_rowdata...                  #
+# Parameter: item                                                        #
+# Parameter: errmsg to be used if item not found                         #
+# Returns: 0 for success , dies (exits) otherwise                        #
+# ---------------------------------------------------------------------- #
 common_validation()
 {
     item=$1
@@ -755,39 +770,38 @@ get_display_widths()
     esac
 }
 
-## user input for multi-line comment
+# ---------------------------------------------------------------------- #
+# user input for multi-line comment                                      #
+# Parameter: if none, then user prompted for entry, else data is         #
+# + appended to bcomments file                                           #
+# ---------------------------------------------------------------------- #
 add_ml_comment(){
     RESULT=0 
     reply="comment"
     if [ $# -gt 0 ]; then
         input=$*
     else
-                echo "Enter new comment (^D to end):"
-                if which rlwrap > /dev/null; then 
-                    input=$( rlwrap cat )
-                else
-                    input=`cat`
-                fi
+        echo "Enter new comment (^D to end):"
+        if which rlwrap > /dev/null; then 
+            input=$( rlwrap cat )
+        else
+            input=`cat`
+        fi
     fi
-                #read input
-                [ -z "$input" ] || {
-                    #[ -z "$reply" ] && die "No section for $reply found in $file"
-                    #now=`date "$DATE_FORMAT"`
-                    pretext="- $TSV_NOW: "
-                    #input has newlines
-                    # make in format (3/16): meaning 3 lines, 16 chars
-                    howmanylines=$( echo -e "$input" | wc -cl | tr -s ' ' | sed 's/^ /(/;s/$/)/;s# #/#')
-                    loginput=$( echo "$input" | tr '\n' '' )
-                    RESULT=1 
-                    # for tsv file
-                    #pretext="$item:com:$pretext"
-                    # C-a processing, adding , comment
-                    update_extra_data "$item" "comment" "$pretext$input"
-                    #echo "${pretext}$loginput" >> "$TSV_EXTRA_DATA_FILE"  # this has control A's, so we can pull one line and subst ^A with nl.
-[ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && {
-pretext="- $TSV_NOW: "
-text=$( echo "$input" | sed "1s/^/$pretext/g" | sed '2,$s/^/                    \>/g' )
-start=$(sed -n "/^$reply:/=" $file)
+    [ -z "$input" ] || {
+        pretext="- $TSV_NOW: "
+        #input has newlines
+        # make in format (3/16): meaning 3 lines, 16 chars
+        howmanylines=$( echo -e "$input" | wc -cl | tr -s ' ' | sed 's/^ /(/;s/$/)/;s# #/#')
+        loginput=$( echo "$input" | tr '\n' '' )
+        RESULT=1 
+        # for tsv file
+        # C-a processing, adding , comment
+        update_extra_data "$item" "comment" "$pretext$input"
+        [ "$TSV_WRITE_FLAT_FILE" -gt 0 ] && {
+        pretext="- $TSV_NOW: "
+        text=$( echo "$input" | sed "1s/^/$pretext/g" | sed '2,$s/^/                    \>/g' )
+        start=$(sed -n "/^$reply:/=" $file)
 ex - $file<<!
 ${start}a
 $text
@@ -797,13 +811,15 @@ x
 }
         log_changes1 "$reply" "#$item $reply added. ${loginput:0:40} ...$howmanylines" 
         echo "Comment added to $item"
-        [ "$TSV_ADD_COMMENT_COUNT_TO_TITLE" -gt 0 ] && add_comment_count_to_title;
+        [ "$TSV_ADD_COMMENT_COUNT_TO_TITLE" -gt 0 ] && update_comment_count;
     
-}
+    }
 } # add_ml
-
-## updates comment count field CC with number of comments
-add_comment_count_to_title(){
+# ---------------------------------------------------------------------- #
+# update_comment_count()                                                 #
+# updates comment count field CC with number of comments                 #
+# ---------------------------------------------------------------------- #
+update_comment_count(){
     #count=$( grep -c "^$item:com:" "$TSV_EXTRA_DATA_FILE" )
     count=$( grep -c "^$KEY" "$TSV_COMMENTS_FILE" )
     # tsv stuff
@@ -812,7 +828,10 @@ add_comment_count_to_title(){
 #    echo "updated title to $newvalue"
 }
 
-## user input for adding a fix/resolution
+# ---------------------------------------------------------------------- #
+# user input for adding a fix/resolution, updates data.tsv               #
+# Parameter: item                                                        #
+# ---------------------------------------------------------------------- #
 add_fix(){
     item=$1
     reply="fix"
@@ -832,8 +851,13 @@ add_fix(){
         let modified+=1
     }
 }
-## in case of quick entry, where user does not want
-##+ to edit, we just append text
+
+# ---------------------------------------------------------------------- #
+# in case of quick entry, where user does not want                       #
+# + to edit, we just append text                                         #
+# Used for description and fix. If exists, append with date, else update #
+# Parameter: item, reply (field: description or fix)                     #
+# ---------------------------------------------------------------------- #
 append_extra_data(){
     item=$1
     reply=$2
@@ -862,11 +886,13 @@ formatted_tsv_headers(){
     echo "-----|-----|-----|-----|------------|------------|------------|-----|-----|-------------------"
 }
 export -f formatted_tsv_headers 
-## headers to print
-## these should be in the same order as data in TSV
-## Caller cuts the fields from here based on which fields are being displayed, using the pipe
-##+ delim on both lines. Don't change delim.
-## @see pretty_print
+# ---------------------------------------------------------------------- #
+# Headers to print                                                       #
+# These should be in the same order as data in TSV                       #
+# Caller cuts the fields from here based on which fields are being       #
+# + displayed, using the pipe delim on both lines. Don't change delim.   #
+# @see pretty_print                                                      #
+# ---------------------------------------------------------------------- #
 pretty_print_headers(){
     echo "-----|---|-----|---|------------|------------|------------|-----|----|------------------------------------------"
     echo "  Id |Sta| Sev |Bug|Assigned To | Start Date |  Due Date  | CC  |Pri |     Title  "
@@ -887,9 +913,11 @@ color_line(){
     echo -e  "$idata"
 }
 
-# returns a serial number based on a file
-# can be used for programs requiring a running id
-# copied from ~/bin/incr_id on 2009-11-16 17:56 
+# ---------------------------------------------------------------------- #
+# get_next_id()                                                          #
+# Returns a serial number based on a file                                #
+# Can be used for programs requiring a running id                        #
+# ---------------------------------------------------------------------- #
 get_next_id(){
     local idfile=$ISSUES_DIR/unique_id
     [ -f "$idfile" ] || echo "0" > "$idfile"
@@ -899,11 +927,16 @@ get_next_id(){
     echo $uniqueid
 }
 
-## Do not call with $() or ``. This does not return values
-## 
+# ---------------------------------------------------------------------- #
+# tsv_get_rowdata_with_lineno()                                          #
+# For given item, fetches row, and sets rowdata string, and lineno       #
+# Do not call with $() or ``. This does not return values                #
+# Called only from common validation                                     #
+# Parameter: item (padded)                                               #
+# Return: nothing, exits if no data for row.                             #
+# ---------------------------------------------------------------------- #
 tsv_get_rowdata_with_lineno(){
     local key="$1" # padded
-    #paditem=$( printf "%4s" $item )
     rowdata=$( grep -n "^$key" "$TSV_FILE" )
     [ -z "$rowdata" ] && { echo "ERROR ITEMNO ($1)"; exit 1;}
     lineno=${rowdata%%:*}
@@ -1016,24 +1049,18 @@ print_item(){
             [ ! -z "$description" ] && { 
             [ "$xfile" == "log" ] && xfile="change log";
             xxfile=$( printf "%-13s" "$xfile" )
-            #row=$( echo -e $PRI_A"$xxfile: "$DEFAULT )
             row=$( echo -e "$xxfile: " )
             output+=$( echo -e "\n$row\n" )
             output+="\n"
-            # C-a processing
-            # next line was indenting second comment too
-            #output+=$( echo "$description" | tr '' '\n' | sed 's/^/  /g;2,$s/^/  /g'  )
             output+=$( echo "$description" |  sed 's/^/  /g;'  )
-            #echo "$description" | tr '' '\n' | sed 's/^/  /g;2,$s/^/                    /g'
             output+="\n"
         }
         done
     echo -e "$output"
-    #echo "index:$index"
-    #paste  <(echo $TSV_PRINTFIELDS | tr ' ' '\n') <(echo "$rowdata" | tr '\t' '\n')
 }
 ## given a date, calculates how much time from now (upcoming or overdue)
 ## If overdue, then says overdue.
+##+ unused, DELETE after copying somewhere
 calc_overdue()
 {
     local due_date="$1"
@@ -1057,8 +1084,13 @@ calc_overdue()
     #echo "$days days $hours hour(s) "
 }
 
-# removed the pesky id in titles, to colorize titles i am colorizing data after last tab
-# \+ does not work in my sed, but works in gsed
+# ---------------------------------------------------------------------- #
+# Does some replacing of codes with symbols for readability              #
+# Also bolds todays and tomorrows dates.                                 #
+# Takes data as stdin and echoes back.                                   #
+# removed the pesky id in titles, to colorize titles i am colorizing     #
+# data after last tab \+ does not work in my sed, but works in gsed      #
+# ---------------------------------------------------------------------- #
 pretty_print(){
     tomorrow=$( date_calc +1 )
     today="$TSV_NOW_SHORT"
@@ -1113,8 +1145,15 @@ pretty_print(){
 DUMMY
     fi
 }
-# return fields from extra file (comments, description, fix)
+# ---------------------------------------------------------------------- #
+# get_extra_data(){                                                      #
+# Earlier longer multi-line data was in another file. Now desc and       #
+# +fix                                                                   #
+# +are in main TSV file.  So Desc and Fix pick data from main file.      #
+# Comments and log pick data from their respective files.                #
+# return fields from extra file (comments, description, fix)             #
 #  2009-11-19 12:48 
+# ---------------------------------------------------------------------- #
 get_extra_data(){
     item=$1
     reply=$2 # field name
@@ -1227,7 +1266,12 @@ else
 fi
 echo "$result"
 }
-## add function creates tsv format file
+# ---------------------------------------------------------------------- #
+# create_tsv_file()                                                      #
+# Takes previously set variables from "add" or "qadd" and writes to      #
+# +data.tsv file. Does some conversions before inserting.                #
+# add function creates tsv format file                                   #
+# ---------------------------------------------------------------------- #
 create_tsv_file()
 {
     del=$DELIM
@@ -1249,25 +1293,18 @@ create_tsv_file()
     tabpri=${i_priority:-"P3"}
     tabtimestamp=$(date +%s)
     TSV_NOW=`date "$TSV_DATE_FORMAT"`
-      [  -z "$i_desc" ] && { i_desc=""; }
-      i_desc=$( echo "$i_desc" | tr '\n' '' )
-      [  -z "$i_fix" ] && { i_fix=""; }
-      i_fix=$( echo "$i_fix" | tr '\n' '' )  # for future in case
+    [  -z "$i_desc" ] && { i_desc=""; }
+    i_desc=$( echo "$i_desc" | tr '\n' '' )
+    [  -z "$i_fix" ] && { i_fix=""; }
+    i_fix=$( echo "$i_fix" | tr '\n' '' )  # for future in case
       # putting desc and fix into main data.tsv
       # added start_date, put crea and mod at end, added pri at 9
     tabfields="$KEY${del}$tabstat${del}$tabseve${del}$tabtype${del}$ASSIGNED_TO${del}$TSV_NOW_SHORT${del}$i_due_date${del}$tabcommentcount$del$tabpri$del$atitle$del$i_desc$del$i_fix$del$TSV_NOW$del$tabtimestamp"
     echo "$tabfields" >> "$TSV_FILE"
     [ -d "$ISSUES_DIR" ] || mkdir "$ISSUES_DIR"
-      #[ ! -z "$i_desc" ] && {
-          #i_desc_pref=$( echo "$i_desc" | sed "s/^/$serialid:des:/g" )
-          #echo "$serialid:des:$i_desc" >> "$TSV_EXTRA_DATA_FILE"
-          # DARN This is supposed to go the C-a way
-          #echo "$i_desc_pref" >> "$TSV_EXTRA_DATA_FILE"
-          #update_extra_data "$item" "description" "$i_desc"
-      #}
-      echo "Created $i_type : $serialid"
-      log_changes1 "create" "#$item created. ($tabtype, $atitle)"
-      [ "$TSV_CREATE_FLAT_FILE" -gt 0 ] && create_flat_file
+    echo "Created $i_type : $serialid"
+    log_changes1 "create" "#$item created. ($tabtype, $atitle)"
+    [ "$TSV_CREATE_FLAT_FILE" -gt 0 ] && create_flat_file
 }
 # we are no longer creating this.
 # however we can use this to dump, or just remove in a while
@@ -1293,6 +1330,13 @@ create_flat_file()
 
 EndUsage
 }
+# ---------------------------------------------------------------------- #
+# getoptlong()                                                           #
+# Reads remaining args starting with -- if any passed                    #
+# +and places in opt_<arg> variables. These -- variables are             #
+# +sub-commands and are given on the CL *after* the action.              #
+# e.g. --sort="1" will result in creation of --opt_sort="1"              #
+# ---------------------------------------------------------------------- #
 getoptlong()
 {
     ## check for -- settings, break into key and value
@@ -2459,7 +2503,7 @@ note: PRIORITY must be anywhere from A to Z."
     if [ "$ANSWER" = "y" ]; then
         sed -i.bak "/$row/d" "$TSV_COMMENTS_FILE"
         [ $TSV_VERBOSE_FLAG -gt 0 ] && echo "Bugzy: '$short_row' deleted."
-        [ "$TSV_ADD_COMMENT_COUNT_TO_TITLE" -gt 0 ] && add_comment_count_to_title;
+        [ "$TSV_ADD_COMMENT_COUNT_TO_TITLE" -gt 0 ] && update_comment_count;
         [ ! -z "$EMAIL_TO" ] && echo -e "$frow" | mail -s "[DELCOMM] $item ($unumber) $short_row" $EMAIL_TO
         cleanup
     else
