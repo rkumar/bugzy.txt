@@ -40,7 +40,6 @@ TSV_EXTRA_DATA_FILE="ext.txt"
 TSV_COMMENTS_FILE="bcomment.tsv"
 TSV_LOG_FILE="blog.tsv"
 TSV_ARCHIVE_FILE="archived.txt"
-#TSV_TITLES_FILE="titles.tsv"
 # what fields are we to prompt for in mod
 TSV_EDITFIELDS="title description status severity type assigned_to start_date due_date priority comment fix"
 TSV_PRINTFIELDS="title id status severity type assigned_to date_created start_date due_date priority"
@@ -960,33 +959,38 @@ tsv_get_column_value(){
     [ -z "$index" -o "$index" -lt 0 ] && { echo "ERROR FIELDNAME $2"; return;}
     echo "$rowdata" | cut -d $'\t' -f$index
 }
-## deletes row from tsv file ONLY
-## Does not delete other files since update uses this.
-tsv_delete_item(){
-    item=$1
+# ------------------------------------------------------------------------------ #
+# tsv_delete_item
+# Deletes item from tsv files and copies to deleted file.
+# $lineno is used for delete.
+# No longer uses item, uses padded KEY for deleting comments.
+# @return  : return value of last delete (of comments file)
+# ------------------------------------------------------------------------------ #
+tsv_delete_item ()
+{
+
     RESULT=0
-    [ $lineno -lt 1 ] && { echo "No such item:$item"; RESULT=-1; return;}
-    #row=$( sed "$lineno!d" "$TSV_FILE" )
+    [ $lineno -lt 1 ] && { echo "No such item:$KEY"; RESULT=-1; return 1;}
     row="$rowdata"
     #echo "row:$row"
-    [ -z "$row" ] && { echo "row blank!"; return; }
+    [ -z "$row" ] && { echo "row blank!"; return 1; }
     [ ! -d "$DELETED_DIR" ] && mkdir "$DELETED_DIR";
     echo "$row" >> "$TSV_FILE_DELETED"
     sed -i.bak "${lineno}d" "$TSV_FILE"
-    [ $? -eq 0 -a "$TSV_VERBOSE_FLAG" -gt 1 ] && echo "Deleted $item."
-    #moved back here on 2009-11-19 12:34 since update does not delete and should not
-    tsv_delete_other_files $item
-    [ $? -eq 0 -a "$TSV_VERBOSE_FLAG" -gt 1 ] && echo "Deleted other files for $item."
+    local retval=$?
+    [ $retval -eq 0 -a "$TSV_VERBOSE_FLAG" -gt 1 ] &&  echo "Deleted $KEY."
+    [ $retval -eq 0 ] &&  { 
+       tsv_delete_other_files 
+       retval=$?
+       [ $retval -eq 0 -a "$TSV_VERBOSE_FLAG" -gt 1 ] && echo "Deleted other files for $KEY."
+    }
+    return $retval
 }
     
 tsv_delete_other_files(){
     ## we only delete comments, not logs
-    item=$1
     RESULT=0
 
-    # delete files from here
-    #grep "^$item:" "$TSV_EXTRA_DATA_FILE" >> deleted.extra.txt
-    #sed -i.bak "/^$item:/d" "$TSV_EXTRA_DATA_FILE"
     grep "^$KEY" "$TSV_COMMENTS_FILE" >> deleted.comments.txt
     sed -i.bak "/^$KEY/d" "$TSV_COMMENTS_FILE"
     return $?
@@ -1379,9 +1383,14 @@ legend(){
     echo
     echo '(-) open/unstarted,  (@) started,  (x) closed.   (#)  bug,  (.) enh/feature, (,) task'
 }
-## newly introduced functions to update and stuff using only bash
-## no more cut, sed and all that for row column updates
-## this is typically called by common_valid and need not be called
+# ---------------------------------------------------------------------------- #
+# convert_row_to_array()                                                       #
+# converts row to an array, so we can fetch and update columns easily.         #
+# Also, put entire row into 0th index. So columns start with 1.                #
+# Newly introduced functions to update and stuff using only bash               #
+# +no more cut, sed and all that for row column updates                        #
+# This is typically called by common_valid and need not be called              #
+# ---------------------------------------------------------------------------- #
 convert_row_to_array(){
     local arow=${1:-"$G_ROWDATA"}
     OLDIFS="$IFS"
@@ -1390,10 +1399,14 @@ convert_row_to_array(){
     F[0]="${arow[@]}"
     IFS="$OLDIFS"
 }
-## convert the array which is being updated, back to a tab delim string
-## so we can update it back
-## this is called by update_row so we need not bother
-convert_array_to_row(){
+# ---------------------------------------------------------------------------- #
+# convert_array_to_row                                                         #
+# convert the array which is being updated, back to a tab delim string         #
+# + so we can update it back                                                   #
+# This is called by update_row so we need not bother                           #
+# ---------------------------------------------------------------------------- #
+convert_array_to_row ()
+{
     DELIM=$'\t'
     G_NEWROW=""
     for index in "${!F[@]}"
@@ -1405,27 +1418,52 @@ convert_array_to_row(){
     G_NEWROW="${G_NEWROW%?}"
     #G_NEWROW=${var:0:${#var}-1}
 }
-#
-set_column(){
+# ---------------------------------------------------------------------------- #
+# set_column                                                                   #
+# sets the given column in the array with given value                          #
+# @param   : index                                                             #
+# @param   : value                                                             #
+# @return  : exits if index lt 1                                               #
+# ---------------------------------------------------------------------------- #
+set_column ()
+{
     index=$1
     [ "$index" -lt 1 ] && { echo "Index starts with 1."; exit 1; }
     shift
     value=$*
     F[$index]="$value"
 }
-#
-get_column(){
+# ------------------------------------------------------------------------------ #
+# get_column
+# returns column value from array based on given index (starting 1)
+# @param   : index
+# @return  : column value
+# ------------------------------------------------------------------------------ #
+get_column ()
+{
     index=$1
     echo "${F[$index]}"
 }
-select_row(){
+# ---------------------------------------------------------------------------- #
+# select_row                                                                   #
+# retrieves row based on item                                                  #
+# @param   : item                                                              #
+# @return  : places row in rowdata                                             #
+# ---------------------------------------------------------------------------- #
+select_row ()
+{
     KEY=$( printf "%4s" $1 )
     rowdata=$( grep "^$KEY" data.tsv )
     G_ROWDATA="$rowdata"
 } 
-## updates the row back to the table
-## adds modified time in epoch after title 9th pos
-update_row(){
+# ---------------------------------------------------------------------------- #
+# update_row                                                                   #
+# Updates the array back to the data file                                      #
+# + using KEY set by common_validation and lineno                              #
+# Adds modified time in epoch after title 9th pos                              #
+# ---------------------------------------------------------------------------- #
+update_row ()
+{
     [ -z "$KEY" ] && { echo "update_row key blank."; exit 1; }
     local seconds=$( date +%s )
     F[$TSV_MODIFIED_COLUMN1]=$seconds
@@ -1444,8 +1482,13 @@ x
 #    diff data.tsv data.tsv.bak
 #    grep "^$KEY" data.tsv
 }
-# sets colindex with index of fieldname
-get_column_index(){
+# ---------------------------------------------------------------------------- #
+# get_column_index                                                             #
+# sets colindex with index of fieldname                                        #
+# @param   : field name                                                        #
+# ---------------------------------------------------------------------------- #
+get_column_index ()
+{
 
     local fieldname="$1"
     local upperc=$( echo $fieldname | tr '[:lower:]' '[:upper:]' )
@@ -1455,8 +1498,15 @@ get_column_index(){
     colindex="${!v}"
     #echo "colindex for $fieldname is $colindex"
 }
-# gets index of field and sets value
-set_update_row(){
+# ---------------------------------------------------------------------------- #
+# set_update_row                                                               #
+# Convenience method to update a row after setting a variable.                 #
+# Typically, most operations modify one column.                                #
+# @param   : fieldname                                                         #
+# @param   : data                                                              #
+# ---------------------------------------------------------------------------- #
+set_update_row ()
+{
     local fieldname="$1"
     shift
     local text="$*"
@@ -1465,11 +1515,17 @@ set_update_row(){
     F[$colindex]="$text"
     update_row
 }
+# ---------------------------------------------------------------------------- #
+# generic_report()                                                             #
+# filters data based on args, cuts based on opt_fields, sorts based on         #
+# + opt_sort and then pretties up the report.                                  #
+# Does too much to be generic. Sadly, colors based on old priorities.          #
+# We should change that.                                                       #
+# ---------------------------------------------------------------------------- #
 generic_report()
 {
-        START=$(date +%s.%N)
-        #formatted_tsv_headers | cut -d '|' -f$opt_fields
-    filter_data "$@" \
+   START=$(date +%s.%N)
+   filter_data "$@" \
         | cut -f$opt_fields  \
         | sed -e "s/${DELIM} $//" \
         -e "s/${DELIM}\(([0-9]\{1,\})\)$/ \1/" \
@@ -1479,12 +1535,21 @@ generic_report()
         | color_by_priority   \
         | pretty_print
 
-        legend
+   legend
         #show_source
-        END=$(date +%s.%N)
-        DIFF=$(echo "$END - $START" | bc)
-        echo $DIFF " seconds."
+   END=$(date +%s.%N)
+   DIFF=$(echo "$END - $START" | bc)
+   echo $DIFF " seconds."
 }
+
+# ---------------------------------------------------------------------------- #
+# filter_data()                                                                #
+# Iterates args and concats a grep filter for each arg                         #
+# If the arg starts with -, then use grep -v                                   #
+# If the arg starts with =, then don't ignorecase                              #
+# If there is an upper case letter in the arg, then case sensitive             #
+# +search is assumed                                                           #
+# ---------------------------------------------------------------------------- #
 
 filter_data(){
     ## pipes filtered data (if search criteria are found in args)
@@ -1566,16 +1631,18 @@ update_start_date(){
             let modified+=1
         }
 }
-## returns fields in order given
-## wish i had seen this before!!!
-## grep "regex" $TSV_FILE | cut_fields '2,1,10,9'
+# ---------------------------------------------------------------------- #
+## Returns fields in order given
+## e.g., grep "regex" $TSV_FILE | cut_fields '2,1,10,9'
 ## sort -d$'\t' -k7,7 $TSV_FILE | cut_fields '2,1,10,9'
 ## If you have set CRITERIA it will get evaluated.
 ##+ e.g. CRITERIA='$2 == "OPE" || $2 == "STA"'
+## btw, i have not used this yet, since i wrote it *after* everything else
+## To use in future
+# ---------------------------------------------------------------------- #
 cut_fields()
 {
     p=\$$( echo $1 | sed 's/,/,\$/g' )
-    #eval "awk -F$'\t' -v o=$'\t' 'BEGIN{OFS=o} {print $p }'" $*
     awk -F$'\t' -v o=$'\t' 'BEGIN{OFS=o}'"$CRITERIA"' {print '$p' }' #"$TSV_FILE"
 }
 
@@ -1643,22 +1710,19 @@ export BLINK='\\033[5m'
 export BLINKOFF='\\033[25m'
 
 # Default priority->color map.
-export PRI_A=$YELLOW        # color for A priority
-export PRI_B=$GREEN         # color for B priority
-export PRI_C=$CYAN    # color for C priority
-export PRI_X=$WHITE         # color for rest of them
-# OLD flat file
-#TSV_SORT_COMMAND=${TSV_SORT_COMMAND:-env LC_COLLATE=C sort -f -k3}
-# for tsv (list cannot use tsv_titles since FILELIST is not used
-#TSV_SORT_COMMAND=${TSV_SORT_COMMAND:-env LC_COLLATE=C sort -f -k2}
+export PRI_A=$YELLOW                                                        #color for A priority
+export PRI_B=$GREEN                                                         #color for B priority
+export PRI_C=$CYAN                                                          #color for C priority
+export PRI_X=$WHITE                                                         #color for rest of them
+
 TSV_SORT_COMMAND=${TSV_SORT_COMMAND:-"env LC_COLLATE=C sort -t$'\t' -k7 -r"}
 REG_ID="^...."
-REG_STATUS="..."
-REG_SEVERITY="..."
-REG_TYPE="..."
-REG_DUE_DATE=".\{10\}"
-REG_DATE_CREATED=".\{16\}"
-REG_ASSIGNED_TO=".\{10\}"
+REG_STATUS="..."                                                            #unused
+REG_SEVERITY="..."                                                          #unused
+REG_TYPE="..."                                                              #unused
+REG_DUE_DATE=".\{10\}"                                                      #unused
+REG_DATE_CREATED=".\{16\}"                                                  #unused
+REG_ASSIGNED_TO=".\{10\}"                                                   #unused
 
 
 if [ -z "$TSV_ACTIONS_DIR" -o ! -d "$TSV_ACTIONS_DIR" ]
@@ -1675,7 +1739,6 @@ fi
 ACTION=${1:-$TSV_DEFAULT_ACTION}
 
 [ -z "$ACTION" ]    && usage
-# added RK 2009-11-06 11:00 to save issues (see edit)
 ISSUES_DIR=$TSV_DIR/.todos
 DELETED_DIR="$ISSUES_DIR/deleted"
 TSV_FILE_DELETED="$DELETED_DIR/deleted.tsv"
@@ -1839,7 +1902,7 @@ case $action in
                 body=`print_item $item`
                 [ ! -d "$DELETED_DIR" ] && mkdir "$DELETED_DIR";
                 # tsv stuff
-                tsv_delete_item $item
+                tsv_delete_item
                 log_changes1 "delete" "#$item deleted ($mtitle)"
                 [ ! -z "$EMAIL_TO" ] && echo -e "$body" | mail -s "[DEL] $mtitle" $EMAIL_TO
                 [ $TSV_VERBOSE_FLAG -gt 0 ] && echo "Bugzy: '$mtitle' deleted."
