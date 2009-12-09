@@ -1679,6 +1679,7 @@ select_source ()
        TSV_COMMENTS_FILE="$TSV_FILE_ARCHIVED_COMMENTS"
     fi
 }
+export -f select_source
 ## ADD FUNCTIONS ABOVE
 out=
 file=
@@ -1772,8 +1773,8 @@ fi
 ACTION=${1:-$TSV_DEFAULT_ACTION}
 
 [ -z "$ACTION" ]    && usage
-ISSUES_DIR=$TSV_DIR/.todos
-DELETED_DIR="$ISSUES_DIR/deleted"
+export ISSUES_DIR=$TSV_DIR/.todos
+export DELETED_DIR="$ISSUES_DIR/deleted"
 TSV_FILE_DELETED="$DELETED_DIR/deleted.tsv"
 TSV_FILE_DELETED_COMMENTS="$DELETED_DIR/deleted_comments.tsv"
 
