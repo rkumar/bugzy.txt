@@ -2349,6 +2349,8 @@ note: PRIORITY must be anywhere from A to Z."
                     paditem=$( printf "%4s" $f )
                     grep "^$paditem" "$TSV_COMMENTS_FILE" >> "$TSV_FILE_ARCHIVED_COMMENTS"
                     sed -i.bak "/^$paditem/d" "$TSV_COMMENTS_FILE"
+                    KEY="$paditem"
+                    log_changes1 "archive" "#$f archived"
                 done
             else 
                 echo "nothing to archive";
