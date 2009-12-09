@@ -2645,6 +2645,8 @@ note: PRIORITY must be anywhere from A to Z."
     cleanup
     ;;
 "undel" | "unrm") # COMMAND: undelete an item
+    ## i was tempted to just change the variables and call "del".
+    ## All this variable setting nonsense is because common_val operates on main file
     errmsg="usage: $TSV_PROGNAME $action task#"
     item=$1
     OLD_TSV_FILE="$TSV_FILE"
@@ -2675,6 +2677,27 @@ note: PRIORITY must be anywhere from A to Z."
     cleanup
     ;;
 
+"unarchive" | "unar") # COMMAND: undelete an item
+    ## i was tempted to just change the variables and call "del".
+    ## All this variable setting nonsense is because common_val operates on main file
+    errmsg="usage: $TSV_PROGNAME $action task#"
+    item=$1
+    paditem=$( printf "%4s" $1 )
+
+    rowdata=$( grep  "^$paditem" "$TSV_FILE_ARCHIVED" )
+    [ -z "$rowdata" ] && { 
+      die "No such item $item in $TSV_FILE_ARCHIVED"
+    }
+
+    grep   "^$paditem" "$TSV_FILE_ARCHIVED" >> "$TSV_FILE"
+    sed -i.bak "/^$paditem/d" "$TSV_FILE_ARCHIVED"
+
+    grep "^$paditem" "$TSV_FILE_ARCHIVED_COMMENTS" >> "$TSV_COMMENTS_FILE"
+    sed -i.bak "/^$paditem/d" "$TSV_FILE_ARCHIVED_COMMENTS"
+    echo "Unarchived $paditem"
+    KEY="$paditem"
+    log_changes1 "unarchive" "#$item unarchived"
+    ;;
 
 "help" ) # COMMAND: detailed help
     help
