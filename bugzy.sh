@@ -19,6 +19,7 @@
 # TODO - how to view archived data                                     #
 # TODO - should be able to search text in desc, fix and comments       #
 # TODO - too many mails, can we configure how many or what events.     #
+# TODO - allow user to not put =1 or =true in -- options
 ## use printf not echo where there are newlines in comment/desc etc    #
 # CAUTION: we are putting priority at start of title, and tags at end. #
 #
@@ -39,7 +40,9 @@ TSV_FILE="data.tsv"
 TSV_EXTRA_DATA_FILE="ext.txt"
 TSV_COMMENTS_FILE="bcomment.tsv"
 TSV_LOG_FILE="blog.tsv"
-TSV_ARCHIVE_FILE="archived.txt"
+TSV_FILE_ARCHIVED="archived.tsv"
+# 2009-12-09 12:02 changed name to underscore
+TSV_FILE_ARCHIVED_COMMENTS="archived_comments.tsv"
 # what fields are we to prompt for in mod
 TSV_EDITFIELDS="title description status severity type assigned_to start_date due_date priority comment fix"
 TSV_PRINTFIELDS="title id status severity type assigned_to date_created start_date due_date priority"
@@ -447,6 +450,7 @@ _list()
     ## Prefix the filter_command with the pre_filter_command
     filter_command="${pre_filter_command:-}"
 
+    select_source # does user want archived or deleted data
 
     [ $TSV_VERBOSE_FLAG -gt 1 ] && echo "$arg0: list : $@"
     for search_term in "$@"
@@ -736,9 +740,6 @@ common_validation()
     local errmsg="$*"
 
     [[ "$item" = +([0-9]) ]] || die "$errmsg"
-    # OLD FILE STUFF
-    #file=$ISSUES_DIR/${item}.txt
-    #[ ! -r "$file" ] && die "No such file: $file"
 
     # tsv stuff
  ## sets rowdata and lineno
@@ -937,7 +938,17 @@ get_next_id(){
 tsv_get_rowdata_with_lineno(){
     local key="$1" # padded
     rowdata=$( grep -n "^$key" "$TSV_FILE" )
-    [ -z "$rowdata" ] && { echo "ERROR ITEMNO ($1)"; exit 1;}
+    [ -z "$rowdata" ] && { 
+       stderr "ERROR ITEMNO ($1)"; 
+       if grep -c "^$key" "$TSV_FILE_DELETED" > /dev/null 2>&1 ; then
+          stderr "$key has been deleted. Try --deleted=true option"
+       else 
+          if  grep -c "^$key" "$TSV_FILE_ARCHIVED" > /dev/null 2>&1 ; then
+             stderr "$key has been archived. Try --archived=true option"
+          fi
+       fi
+       exit 1;
+    }
     lineno=${rowdata%%:*}
     rowdata=${rowdata#*:}
     G_LINENO=$lineno
@@ -991,7 +1002,7 @@ tsv_delete_other_files(){
     ## we only delete comments, not logs
     RESULT=0
 
-    grep "^$KEY" "$TSV_COMMENTS_FILE" >> deleted.comments.txt
+    grep "^$KEY" "$TSV_COMMENTS_FILE" >> "$TSV_FILE_DELETED_COMMENTS"
     sed -i.bak "/^$KEY/d" "$TSV_COMMENTS_FILE"
     return $?
 }
@@ -1029,9 +1040,9 @@ convert_short_to_long_code(){
 ## however the caller can color the labels.
 ## echo -e "`b print 143 | sed 's/^\([^:]*\):/'$YELLOW'\1:'$DEFAULT'/g' `"
 print_item(){
-    errmsg="usage: $TSV_PROGNAME $action [--no_log] task#"
+    errmsg="usage: $TSV_PROGNAME $action [--no-log=true] [--deleted=true] [--archived=true] task#"
+    select_source
     common_validation $1 $errmsg
-
     output=""
     for field in $( echo $TSV_PRINTFIELDS )
     do
@@ -1184,6 +1195,7 @@ get_extra_data(){
     # tsv stuff
     # combined file approach
     regex="^$item:${reply:0:3}" 
+    stderr "ERROR!!!! should never come here: $item, $reply"
     description=$( grep "^$item:${reply:0:3}" "$TSV_EXTRA_DATA_FILE"  | cut -d: -f3- )
     if [ ! -z "$description" ]; then
         if [ $reply == "log" ]; then
@@ -1356,7 +1368,7 @@ getoptlong()
             #val="${f#*=}"
             val=$( expr "$f" : '[^=]*=\(.*\)' )
             key="${f%=*}"
-            [ -z "$val" ] && echo "*** Warning. No value found for $key. Use = as delimiter, not space"
+            [ -z "$val" ] && stderr "*** Warning. No value found for $key. Use = as delimiter, not space"
             # declare will be local when we move this to a function
             #declare i_${key}=$val
             # sorry, in this case we were setting i_ vars
@@ -1453,7 +1465,7 @@ get_column ()
 select_row ()
 {
     KEY=$( printf "%4s" $1 )
-    rowdata=$( grep "^$KEY" data.tsv )
+    rowdata=$( grep "^$KEY" "$TSV_FILE" )
     G_ROWDATA="$rowdata"
 } 
 # ---------------------------------------------------------------------------- #
@@ -1469,7 +1481,7 @@ update_row ()
     F[$TSV_MODIFIED_COLUMN1]=$seconds
     convert_array_to_row
     ## sed crashes out if slash etc in text. What other delim can i use that wont be in data
-   # sed -i.bak "/^$KEY/s/.*/$G_NEWROW/" data.tsv
+   # sed -i.bak "/^$KEY/s/.*/$G_NEWROW/" "$TSV_FILE"
     [ -z "$lineno" ] && { echo "update_row lineno blank."; exit 1; }
 ex - "$TSV_FILE"<<!
 ${lineno}c
@@ -1479,8 +1491,8 @@ x
 !
 
     echo "updated $KEY"
-#    diff data.tsv data.tsv.bak
-#    grep "^$KEY" data.tsv
+#    diff "$TSV_FILE" "$TSV_FILE".bak
+#    grep "^$KEY" "$TSV_FILE"
 }
 # ---------------------------------------------------------------------------- #
 # get_column_index                                                             #
@@ -1555,6 +1567,8 @@ filter_data(){
     ## pipes filtered data (if search criteria are found in args)
     ## call thusly: filter_data "$@" | cut -fn,m | sed 's//'
     ## file is assumed to be TSV_FILE
+
+    select_source # does user want archived or deleted data
 
     EXTENDED_GREP="-E"
 
@@ -1645,7 +1659,28 @@ cut_fields()
     p=\$$( echo $1 | sed 's/,/,\$/g' )
     awk -F$'\t' -v o=$'\t' 'BEGIN{OFS=o}'"$CRITERIA"' {print '$p' }' #"$TSV_FILE"
 }
+## print to standard error
+stderr()
+{
+   echo "$*" 1>&2
+}
+# ---------------------------------------------------------------------------- #
+# select_source                                                                #
+# check to see if user wants data from deleted or archived                     #
+# @return  : 0.  sets TSV_FILE and TSV_COMMENTS_FILE                           #
+# ---------------------------------------------------------------------------- #
+select_source ()
+{
 
+    if [ ! -z "$opt_deleted" ]; then
+       TSV_FILE="$TSV_FILE_DELETED"
+       TSV_COMMENTS_FILE="$TSV_FILE_DELETED_COMMENTS"
+    fi
+    if [ ! -z "$opt_archived" ]; then
+       TSV_FILE="$TSV_FILE_ARCHIVED"
+       TSV_COMMENTS_FILE="$TSV_FILE_ARCHIVED_COMMENTS"
+    fi
+}
 ## ADD FUNCTIONS ABOVE
 out=
 file=
@@ -1742,6 +1777,7 @@ ACTION=${1:-$TSV_DEFAULT_ACTION}
 ISSUES_DIR=$TSV_DIR/.todos
 DELETED_DIR="$ISSUES_DIR/deleted"
 TSV_FILE_DELETED="$DELETED_DIR/deleted.tsv"
+TSV_FILE_DELETED_COMMENTS="$DELETED_DIR/deleted_comments.tsv"
 
 if [ $TSV_PLAIN = 1 ]; then
     PRI_A=$NONE
@@ -2301,12 +2337,11 @@ note: PRIORITY must be anywhere from A to Z."
                     echo "Your regex is not working on sed. $sedfound items instead of $count"
                     exit 1
                 fi
-                grep   "$regex" "$TSV_FILE" >> "$TSV_ARCHIVE_FILE"
+                grep   "$regex" "$TSV_FILE" >> "$TSV_FILE_ARCHIVED"
                 # DARN sed wont take perl expressions
                 sed -i.bak "/$regex/d" "$TSV_FILE"
-                echo "$count row/s archived to $TSV_ARCHIVE_FILE";
+                echo "$count row/s archived to $TSV_FILE_ARCHIVED";
                 echo "cleaning other/older files: ($toarch)"
-                #[ ! -d "archived" ] && mkdir archived;
                 for f in $toarch
                 do
                     echo "$f"
@@ -2314,7 +2349,7 @@ note: PRIORITY must be anywhere from A to Z."
                     #sed -i.bak "/^$f/d" "$TSV_EXTRA_DATA_FILE"
                     #sed "/^$f/!d" "$TSV_EXTRA_DATA_FILE"
                     paditem=$( printf "%4s" $f )
-                    grep "^$paditem" "$TSV_COMMENTS_FILE" >> archived.comments.txt
+                    grep "^$paditem" "$TSV_COMMENTS_FILE" >> "$TSV_FILE_ARCHIVED_COMMENTS"
                     sed -i.bak "/^$paditem/d" "$TSV_COMMENTS_FILE"
                 done
             else 
@@ -2441,10 +2476,10 @@ note: PRIORITY must be anywhere from A to Z."
 
         ;;
 "status" ) # COMMAND: prints completion status of bugs, features, enhancements, tasks
-        bugarch=$(grep -c BUG "$TSV_ARCHIVE_FILE" )
-        enharch=$(grep -c ENH "$TSV_ARCHIVE_FILE" )
-        feaarch=$(grep -c FEA "$TSV_ARCHIVE_FILE" )
-        tasarch=$(grep -c TAS "$TSV_ARCHIVE_FILE" )
+        bugarch=$(grep -c BUG "$TSV_FILE_ARCHIVED" )
+        enharch=$(grep -c ENH "$TSV_FILE_ARCHIVED" )
+        feaarch=$(grep -c FEA "$TSV_FILE_ARCHIVED" )
+        tasarch=$(grep -c TAS "$TSV_FILE_ARCHIVED" )
         bugctr=$bugarch
         bugclo=$bugarch
         feactr=$feaarch
@@ -2531,7 +2566,7 @@ note: PRIORITY must be anywhere from A to Z."
      | while read LINE; 
        do item=$( echo "$LINE" |cut -d$'\t' -f1 ); 
            paditem=$( printf "%4s" $item )
-           title=$( grep "^$paditem" data.tsv | cut -d$'\t' -f1,10;)
+           title=$( grep "^$paditem" "$TSV_FILE" | cut -d$'\t' -f1,10;)
            echo
            text=$( echo -e $PRI_B"$title"$DEFAULT )
            echo -e "--- $text ---"
