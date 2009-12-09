@@ -2646,40 +2646,27 @@ note: PRIORITY must be anywhere from A to Z."
     ;;
 "undel" | "unrm") # COMMAND: undelete an item
     ## i was tempted to just change the variables and call "del".
-    ## All this variable setting nonsense is because common_val operates on main file
     errmsg="usage: $TSV_PROGNAME $action task#"
     item=$1
-    OLD_TSV_FILE="$TSV_FILE"
-    OLD_TSV_COMMENTS_FILE="$TSV_COMMENTS_FILE"
+    paditem=$( printf "%4s" $1 )
 
-    TSV_FILE="$TSV_FILE_DELETED"
-    TSV_COMMENTS_FILE="$TSV_FILE_DELETED_COMMENTS"
-    
-    TSV_FILE_DELETED="$OLD_TSV_FILE"
-    TSV_FILE_DELETED_COMMENTS="$OLD_TSV_COMMENTS_FILE"
+    rowdata=$( grep  "^$paditem" "$TSV_FILE_DELETED" )
+    [ -z "$rowdata" ] && { 
+      die "No such item $item in $TSV_FILE_DELETED"
+    }
 
-    common_validation $1 "$errmsg"
-#    echo "ROW:$rowdata"
-#    echo "copying row to $TSV_FILE_DELETED"
-#    read
-    echo "$rowdata" >> "$TSV_FILE_DELETED"
-#    echo "deleting $lineno from $TSV_FILE"
-#    read
-    sed -i.bak "${lineno}d" "$TSV_FILE"
-    grep "^$KEY" "$TSV_COMMENTS_FILE" >> "$TSV_FILE_DELETED_COMMENTS"
-    sed -i.bak "/^$KEY/d" "$TSV_COMMENTS_FILE"
-    echo "Undeleted $KEY"
-    log_changes1 "undelete" "#$item deleted ($G_TITLE)"
-#    echo "Looks like we are done ... data.tsv"
-#    grep "^$KEY" data.tsv
-#    echo "Looks like we are done ...comments"
-#    grep "^$KEY" bcomment.tsv
+    grep   "^$paditem" "$TSV_FILE_DELETED" >> "$TSV_FILE"
+    sed -i.bak "/^$paditem/d" "$TSV_FILE_DELETED"
+
+    grep "^$paditem" "$TSV_FILE_DELETED_COMMENTS" >> "$TSV_COMMENTS_FILE"
+    sed -i.bak "/^$paditem/d" "$TSV_FILE_DELETED_COMMENTS"
+    echo "Undeleted $paditem"
+    KEY="$paditem"
+    log_changes1 "undeleted" "#$item undeleted"
     cleanup
     ;;
 
-"unarchive" | "unar") # COMMAND: undelete an item
-    ## i was tempted to just change the variables and call "del".
-    ## All this variable setting nonsense is because common_val operates on main file
+"unarchive" | "unar") # COMMAND: unarchive an item
     errmsg="usage: $TSV_PROGNAME $action task#"
     item=$1
     paditem=$( printf "%4s" $1 )
