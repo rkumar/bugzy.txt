@@ -8,23 +8,21 @@
 #             A simple file-based bug tracker           #
 #*******************************************************#
 #                                                       
-# 2009-11-24 v0.1.12 - am removing old flat file creation
+# 2009-11-24 v0.1.12 - removed old flat file creation
 # 2009-11-29 v0.1.14 - added modified timestamp and comment count in tsv file
 # 2009-11-30 v0.1.16 - moved description and fix into tsv 
 # 2009-12-01 v0.1.16 - separated log and comments
-# 2009-12-02 v0.2.00 - replace date_created with start_date, and put create at end
-# rkumar                                                
+# 2009-12-02 v0.2.00 - replaced date_created with start_date, and put create at end
 # 
 # 
-# TODO - how to view archived data                                     #
-# TODO - should be able to search text in desc, fix and comments       #
+# TODO - should be able to search text in comments                     #
 # TODO - too many mails, can we configure how many or what events.     #
 # TODO - allow user to not put =1 or =true in -- options
 ## use printf not echo where there are newlines in comment/desc etc    #
 # CAUTION: we are putting priority at start of title, and tags at end. #
 #
 
-#### --- cleanup code use at start ---- ####
+#### --- initializations ---- ####
 TMP_FILE=${TMPDIR:-/tmp}/prog.$$
 trap "rm -f $TMP_FILE; exit 1" 0 1 2 3 13 15
 TSV_PROGNAME=$(basename "$0")
@@ -773,7 +771,7 @@ get_display_widths()
 # ---------------------------------------------------------------------- #
 # user input for multi-line comment                                      #
 # Parameter: if none, then user prompted for entry, else data is         #
-# + appended to bcomments file                                           #
+# + appended to bcomment file                                           #
 # ---------------------------------------------------------------------- #
 add_ml_comment(){
     RESULT=0 
@@ -2646,6 +2644,37 @@ note: PRIORITY must be anywhere from A to Z."
     done
     cleanup
     ;;
+"undel" | "unrm") # COMMAND: undelete an item
+    errmsg="usage: $TSV_PROGNAME $action task#"
+    item=$1
+    OLD_TSV_FILE="$TSV_FILE"
+    OLD_TSV_COMMENTS_FILE="$TSV_COMMENTS_FILE"
+
+    TSV_FILE="$TSV_FILE_DELETED"
+    TSV_COMMENTS_FILE="$TSV_FILE_DELETED_COMMENTS"
+    
+    TSV_FILE_DELETED="$OLD_TSV_FILE"
+    TSV_FILE_DELETED_COMMENTS="$OLD_TSV_COMMENTS_FILE"
+
+    common_validation $1 "$errmsg"
+#    echo "ROW:$rowdata"
+#    echo "copying row to $TSV_FILE_DELETED"
+#    read
+    echo "$rowdata" >> "$TSV_FILE_DELETED"
+#    echo "deleting $lineno from $TSV_FILE"
+#    read
+    sed -i.bak "${lineno}d" "$TSV_FILE"
+    grep "^$KEY" "$TSV_COMMENTS_FILE" >> "$TSV_FILE_DELETED_COMMENTS"
+    sed -i.bak "/^$KEY/d" "$TSV_COMMENTS_FILE"
+    echo "Undeleted $KEY"
+    log_changes1 "undelete" "#$item deleted ($G_TITLE)"
+#    echo "Looks like we are done ... data.tsv"
+#    grep "^$KEY" data.tsv
+#    echo "Looks like we are done ...comments"
+#    grep "^$KEY" bcomment.tsv
+    cleanup
+    ;;
+
 
 "help" ) # COMMAND: detailed help
     help
