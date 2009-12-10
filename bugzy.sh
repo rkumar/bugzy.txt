@@ -91,7 +91,7 @@ shorthelp()
 
       Operations:
         add|a "Fix calculation in +project @context"
-        archive|ar
+        archive|ar [--all=true] [items]
         comment|addcomment NUMBER
         command [ACTIONS] 
         del|rm NUMBER 
@@ -101,6 +101,8 @@ shorthelp()
         modify|mod NUMBER
         pri|p NUMBER PRIORITY
         tag ITEM1 ITEM1 ... ITEMn TAG
+        undel ITEM#
+        unarchive ITEM#
 
         open|ope     NUMBER
         started|sta  NUMBER
@@ -146,7 +148,10 @@ help() # COMMAND: shows help
 
         archive 
         ar 
-          Moves closed and canceled items to archive.txt
+        ar --all=true
+          Moves all closed and canceled items to archive.txt
+        ar 100 102
+          Moves given items to archive.txt
 
         comment NUMBER [TEXT]
         addcomment NUMBER [TEXT]
@@ -2326,6 +2331,23 @@ note: PRIORITY must be anywhere from A to Z."
 
 "archive" | "ar" ) # COMMAND: move closed and canceled bugs
             #regex="${REG_ID}${DELIM}(CLO|CAN)"
+            if [[ -z "$opt_all" ]]; then
+               #statements
+               errmsg="usage: $TSV_PROGNAME $action ITEM#"
+               numargs=$#
+               for ((i=1 ; i <= numargs ; i++)); do
+                  common_validation $1 $errmsg 
+                  grep "^$KEY" "$TSV_FILE" >> "$TSV_FILE_ARCHIVED"
+                  sed -i.bak "/^$KEY/d" "$TSV_FILE"
+                  grep "^$KEY" "$TSV_COMMENTS_FILE" >> "$TSV_FILE_ARCHIVED_COMMENTS"
+                  sed -i.bak "/^$KEY/d" "$TSV_COMMENTS_FILE"
+                  stderr "$item archived."
+                  log_changes1 "archive" "#$item archived"
+                  shift
+               done
+               exit 0
+            fi
+            ## this is the case with --all=true, all closed and cancelled items are moved
             regex="${REG_ID}${DELIM}C[LA][NO]"
             count=$( grep -c   "$regex" "$TSV_FILE" )
             toarch=$( grep   "$regex" "$TSV_FILE" | cut -f1 | sed 's/^ //g' )
@@ -2344,9 +2366,6 @@ note: PRIORITY must be anywhere from A to Z."
                 for f in $toarch
                 do
                     echo "$f"
-                    #grep "^$f" ext.txt >> archive.ext.txt
-                    #sed -i.bak "/^$f/d" "$TSV_EXTRA_DATA_FILE"
-                    #sed "/^$f/!d" "$TSV_EXTRA_DATA_FILE"
                     paditem=$( printf "%4s" $f )
                     grep "^$paditem" "$TSV_COMMENTS_FILE" >> "$TSV_FILE_ARCHIVED_COMMENTS"
                     sed -i.bak "/^$paditem/d" "$TSV_COMMENTS_FILE"
@@ -2434,8 +2453,6 @@ note: PRIORITY must be anywhere from A to Z."
             for item in "$@"
             do
                 common_validation $item "$errmsg"
-                ## CAUTION: we are adding to end of row, so if new column is added XXX
-                #sed -i.bak "/^$paditem/s/.*/& $tag/" "$TSV_FILE"
                 F[$TSV_TITLE_COLUMN1]="$G_TITLE $tag"
                 update_row
                 log_changes1 "tag" "#$item tagged with $tag"
