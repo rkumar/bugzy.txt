@@ -1778,6 +1778,10 @@ fi
 ACTION=${1:-$TSV_DEFAULT_ACTION}
 
 [ -z "$ACTION" ]    && usage
+[ -w "$TMP_FILE"  ] || echo -n > "$TMP_FILE" || die "Fatal Error: Unable to write to $TMP_FILE"
+[ -f "$TSV_FILE" ] || cp /dev/null "$TSV_FILE"
+[ -f "$TSV_COMMENTS_FILE" ] || cp /dev/null "$TSV_COMMENTS_FILE"
+
 export ISSUES_DIR=$TSV_DIR/.todos
 export DELETED_DIR="$ISSUES_DIR/deleted"
 TSV_FILE_DELETED="$DELETED_DIR/deleted.tsv"
