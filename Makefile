@@ -9,8 +9,11 @@ dist: $(DISTFILES) bugzy.sh
 	echo "ver: $(VERSION)"
 	mkdir -p $(DISTNAME)
 	mkdir -p $(DISTNAME)/addons
+	mkdir -p $(DISTNAME)/.todos
 	cp -f $(DISTFILES) $(DISTNAME)/
+	cp todo.txt done.txt $(DISTNAME)/
 	cp -f addons/* $(DISTNAME)/addons
+	cp -f .todos/*.tsv $(DISTNAME)/.todos
 	sed -e 's/@REVISION@/'$(VERSION)'/' bugzy.sh > $(DISTNAME)/bugzy.sh
 	tar cf $(DISTNAME).tar $(DISTNAME)/
 	gzip -f -9 $(DISTNAME).tar
@@ -27,7 +30,7 @@ ACTIONS_DIR=~/.bugzy.actions.d
 install:
 	#[ bugzy.cgf -nt ~/bugzy.cfg ] && cp -i bugzy.cfg ~/
 	## updating cfg
-	cp -uvp bugzy.cfg ~/
+	#cp -uvp bugzy.cfg ~/
 	## updating addons
 	cp -uvp ./addons/* $(ACTIONS_DIR)
 	chmod +x $(ACTIONS_DIR)/*

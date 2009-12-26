@@ -1779,8 +1779,6 @@ ACTION=${1:-$TSV_DEFAULT_ACTION}
 
 [ -z "$ACTION" ]    && usage
 [ -w "$TMP_FILE"  ] || echo -n > "$TMP_FILE" || die "Fatal Error: Unable to write to $TMP_FILE"
-[ -f "$TSV_FILE" ] || cp /dev/null "$TSV_FILE"
-[ -f "$TSV_COMMENTS_FILE" ] || cp /dev/null "$TSV_COMMENTS_FILE"
 
 export ISSUES_DIR=$TSV_DIR/.todos
 export DELETED_DIR="$ISSUES_DIR/deleted"
@@ -1794,7 +1792,11 @@ if [ $TSV_PLAIN = 1 ]; then
     PRI_X=$NONE
     DEFAULT=$NONE
 fi
-cd $ISSUES_DIR
+[ -d "$ISSUES_DIR" ] || mkdir "$ISSUES_DIR"
+cd $ISSUES_DIR || die "Could not cd to $ISSUES_DIR"
+
+[ -f "$TSV_FILE" ] || touch "$TSV_FILE"
+[ -f "$TSV_COMMENTS_FILE" ] || touch "$TSV_COMMENTS_FILE"
 
 
 # == HANDLE ACTION ==

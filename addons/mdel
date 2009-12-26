@@ -1,7 +1,7 @@
 #!/bin/bash
 
 action=$1
-shift
+#shift
 
 [ "$action" = "usage" -o $# -lt 1 ] && {
   echo "    mdel item# item# ..."

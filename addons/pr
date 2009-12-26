@@ -1,0 +1,82 @@
+#!/bin/bash
+#
+
+readvars()
+{
+   read item
+   read status
+   read severity
+   read type
+   read assigned_to
+   read start_date
+   read due_date
+   read comment_count
+   read priority
+   read title
+   read desc
+   read fix
+   read created_date
+   read modified_timestamp
+
+}
+
+print_i ()
+{
+paditem=$( printf "%4s" $1 )
+readvars <<END
+$( grep "^$paditem" "$TSV_FILE" | tr '\t' '\n'  )
+END
+comments=$( grep "^$paditem" "$TSV_COMMENTS_FILE" | cut -f2- | tr '' '\n' | sed 's/^/  /')
+today=$( date +%s )
+[ -z "$modified_timestamp" ] && modified_timestamp=0
+seconds=$(( $today-$modified_timestamp  ))
+days=$(( $seconds/(3600*24) ))
+modage="$days days ago"
+create_ts=$( date --date="$created_date" +%s )
+seconds=$(( $today-$create_ts  ))
+days=$(( $seconds/(3600*24) ))
+age="$days days "
+
+
+   line1="#$item: $title"
+   line=$( jot -s "" -b '-' 80 )
+   echo
+   echo "$line1"
+   
+cat <<END
+$( printf "%40.40s+%40.40s\n" "$line" "$line")
+ $( printf "%-38s | %-38s\n" "      Type:   $type"       " Assigned to:   $assigned_to" )
+ $( printf "%-38s | %-38s\n" "  Priority:   $priority"   "         Age:   $age" )
+ $( printf "%-38s | %-38s\n" "  Severity:   $severity"   "  Start Date:   $start_date" )
+ $( printf "%-38s | %-38s\n" "    Status:   $status"     "    Due Date:   $due_date" )
+$( printf "%40.40s+%40.40s\n" "$line" "$line")
+Detailed description:
+$( echo "$desc" | tr '' '\n' | sed 's/^/  /' )
+
+Fix:
+$( echo "$fix" | tr '' '\n'  | sed 's/^/  /')
+
+Comments:
+$comments
+Last Modified: $modage
+END
+}
+
+action=$1
+
+[ "$action" = "usage" -o $# -lt 1 ] && {
+  echo "    pr item# item# ..."
+  echo "    print multiple items"
+  echo "        pr 101 102 103"
+  echo ""
+  exit
+}
+while true
+do
+    if [[ -z "$1" ]]; then
+        break
+    fi
+    item=$1
+    print_i "$item"
+    shift
+done

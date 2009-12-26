@@ -1,0 +1,10 @@
+#!/bin/bash
+
+action=$1
+[ "$action" = "usage" -o $# -lt 1 ] && {
+  echo "    grepcomment <pattern>"
+  echo "        search for a pattern/string in comments"
+  exit
+}
+echo "Searching for $1"
+grep -E "$1" "$TSV_COMMENTS_FILE"  | sed 's//   /g' | tr '' '\n' 

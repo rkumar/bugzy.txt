@@ -108,6 +108,10 @@ sorted above. "depri" removes priority.
 **Add-ons** include `mdel`, `mpri`, `mdepri` which do multiple deletes or
 priority setting and unsetting.
 
+From v0.3.0, you may view deleted or archived data with the
+--deleted=true or --archived=true. This would work for `show`, `print`,
+`list`, `quick`, `grep`.
+
 TO ADD MORE HERE.
 
 You may also alias bugzy to "b" in ~/.bashrc or equivalent.

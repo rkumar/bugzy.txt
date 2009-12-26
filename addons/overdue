@@ -7,13 +7,13 @@
 # 
 #-------------------------------------------------------#
 action=$1
-shift
+#shift
 
 [ "$action" = "usage"  ] && {
   echo "    overdue [--started=1]"
   echo "    overdue "
   echo "       list items that should have completed"
-  echo "    overdue --start=1"
+  echo "    overdue --started=1"
   echo "       list items that should have started"
   echo ""
   exit
