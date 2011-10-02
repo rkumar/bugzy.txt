@@ -182,7 +182,7 @@ help() # COMMAND: shows help
           Display this help message.
 
         list [-l] [TERM...]
-        ls [-l] [TERM...]
+        ls [-l] [TERM...]    e.g. bugzy -l list
           Displays all bug's that contain TERM(s) sorted by priority with line
           numbers.  If no TERM specified, lists all items.
           The -l option results in descriptions, comments and fix being printed also.
@@ -521,7 +521,9 @@ _list()
             rowitem=${rowitem// /}
             KEY=$( printf "%4s" $rowitem )
             if [[ "$rowitem" = +([0-9]) ]]; then  
-                tsv_get_column_value $rowitem "description" | sed '1s/^/      Desc: /;2,$s/^/      >/g;'
+                #tsv_get_column_value $rowitem "description" | sed '1s/^/      Desc: /;2,$s/^/      >/g;'
+                x=$(tsv_get_column_value $rowitem "description" | sed '1s/^/   '$GREEN'   Desc: /;2,$s/^/      >/g;$s/$/'$DEFAULT'/g;')
+                echo -e "${x}"
                 #get_extra_data $rowitem description | sed '1s/^/      Desc: /;2,$s/^/      >/g;'
                 get_extra_data $rowitem comment     | sed '1s/^/      Comments: /;2,$s/^/      >/g;'
             else
@@ -613,7 +615,7 @@ user_input()
     [ ! -z "$defval" ] && local prompts=" [default is $defval]"
     echo -n "Enter ${field}${prompts}: "
     read input
-    [ -n "$input" ] && eval $2=\$input
+    #[ -n "$input" ] && eval $2=\$input # flunked on @gmail.com -- 2011-09-18 commented off since borks
     [ -z "$input" ] && input="$defval"
     RESULT=$input
 }
